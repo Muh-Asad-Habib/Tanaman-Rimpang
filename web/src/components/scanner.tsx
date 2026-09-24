@@ -55,7 +55,12 @@ export function Scanner() {
     mounted.current = true;
     const instance = new InferenceEngine((next) => {
       if (mounted.current && modeRef.current !== "demo") setResult(next);
-    }, (next) => { if (mounted.current) setState(next); });
+    }, (next) => {
+      if (mounted.current) {
+        setState(next);
+        if (next.status !== "ready") setResult(null);
+      }
+    });
     engine.current = instance;
     void instance.initialize();
     const visibility = () => { if (document.hidden) stop(); };
@@ -97,6 +102,11 @@ export function Scanner() {
       });
       if (!mounted.current || current !== operation.current) { media.getTracks().forEach((track) => track.stop()); return; }
       stream.current = media;
+      media.getVideoTracks().forEach((track) => track.addEventListener("ended", () => {
+        if (!mounted.current || current !== operation.current || stream.current !== media) return;
+        stop();
+        setError("Kamera terputus atau izinnya dicabut. Aktifkan kembali kamera untuk melanjutkan.");
+      }, { once: true }));
       if (!video.current) throw new Error("Pratinjau kamera tidak tersedia.");
       video.current.srcObject = media;
       await video.current.play();
