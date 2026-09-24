@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "domain": "rimpang-hasil-panen",
+  "labels": [
+    { "id": 0, "slug": "jahe", "name": "Jahe" },
+    { "id": 1, "slug": "jahe-merah", "name": "Jahe Merah" },
+    { "id": 2, "slug": "kencur", "name": "Kencur" },
+    { "id": 3, "slug": "kunyit", "name": "Kunyit" },
+    { "id": 4, "slug": "kunyit-putih", "name": "Kunyit Putih" },
+    { "id": 5, "slug": "lempuyang", "name": "Lempuyang" },
+    { "id": 6, "slug": "lengkuas", "name": "Lengkuas" },
+    { "id": 7, "slug": "temu-hitam", "name": "Temu Hitam" },
+    { "id": 8, "slug": "temu-kunci", "name": "Temu Kunci" },
+    { "id": 9, "slug": "temulawak", "name": "Temulawak" }
+  ]
+}

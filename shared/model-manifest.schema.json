@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rimpang model bundle v1",
+  "type": "object",
+  "required": ["schemaVersion", "status", "labelsVersion"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "labelsVersion": { "const": 1 },
+    "status": { "enum": ["unavailable", "ready"] },
+    "reason": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "classSlugs": {
+      "const": ["jahe", "jahe-merah", "kencur", "kunyit", "kunyit-putih", "lempuyang", "lengkuas", "temu-hitam", "temu-kunci", "temulawak"]
+    },
+    "maxObjects": { "const": 5 },
+    "detector": { "$ref": "#/$defs/detector" },
+    "classifier": { "$ref": "#/$defs/classifier" }
+  },
+  "allOf": [{
+    "if": { "properties": { "status": { "const": "ready" } } },
+    "then": { "required": ["version", "classSlugs", "maxObjects", "detector", "classifier"] },
+    "else": { "required": ["reason"] }
+  }],
+  "$defs": {
+    "triple": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+    "artifact": {
+      "type": "object",
+      "required": ["file", "sha256", "inputName", "outputName", "inputSize", "dtype"],
+      "properties": {
+        "file": { "type": "string", "pattern": "^[a-zA-Z0-9_.-]+\\.onnx$" },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "inputName": { "type": "string", "minLength": 1 },
+        "outputName": { "type": "string", "minLength": 1 },
+        "inputSize": { "type": "integer", "minimum": 32, "maximum": 1024 },
+        "dtype": { "const": "float32" }
+      }
+    },
+    "detector": {
+      "allOf": [
+        { "$ref": "#/$defs/artifact" },
+        {
+          "required": ["outputLayout", "scoreThreshold", "iouThreshold", "padValue"],
+          "properties": {
+            "outputLayout": { "const": "1x5xN" },
+            "scoreThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+            "iouThreshold": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+            "padValue": { "const": 114 }
+          }
+        }
+      ]
+    },
+    "classifier": {
+      "allOf": [
+        { "$ref": "#/$defs/artifact" },
+        {
+          "required": ["mean", "std", "cropMargin", "scoreThreshold", "minMargin"],
+          "properties": {
+            "mean": { "$ref": "#/$defs/triple" },
+            "std": { "type": "array", "items": { "type": "number", "exclusiveMinimum": 0 }, "minItems": 3, "maxItems": 3 },
+            "cropMargin": { "type": "number", "minimum": 0, "maximum": 0.5 },
+            "scoreThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+            "minMargin": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      ]
+    }
+  }
+}
