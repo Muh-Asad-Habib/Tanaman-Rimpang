@@ -1,0 +1,11 @@
+{
+  "model": "yolo11n.pt",
+  "epochs": 80,
+  "imgsz": 416,
+  "batch": 16,
+  "patience": 15,
+  "seed": 42,
+  "workers": 4,
+  "single_cls": true,
+  "deterministic": true
+}

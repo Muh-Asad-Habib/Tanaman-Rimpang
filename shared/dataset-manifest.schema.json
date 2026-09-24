@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Master annotations Rimpang v1",
+  "type": "object",
+  "required": ["schemaVersion", "labelsVersion", "images"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "labelsVersion": { "const": 1 },
+    "images": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sourceId", "groupId", "objects"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sourceId": { "type": "string", "minLength": 1 },
+          "groupId": { "type": "string", "minLength": 1 },
+          "license": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "split": { "enum": ["train", "valid", "test"] },
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["classId", "bbox"],
+              "properties": {
+                "classId": { "type": "integer", "minimum": 0, "maximum": 9 },
+                "bbox": {
+                  "type": "array", "minItems": 4, "maxItems": 4,
+                  "items": { "type": "number", "minimum": 0, "maximum": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

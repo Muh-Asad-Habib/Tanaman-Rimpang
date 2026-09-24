@@ -52,6 +52,25 @@ Preview/hasil diproses dalam memori dan dibersihkan saat sesi berganti. WebGPU
 dipakai jika model dan perangkat mendukung; WASM single-thread adalah fallback
 yang dinyatakan, bukan janji realtime di setiap HP.
 
+## Data dan training di server
+
+Training sengaja ditunda. Tidak ada dataset pulihan, bobot terlatih, atau hasil
+akurasi baru yang disertakan. Jalankan semua modul Python dari root proyek,
+bukan dari folder `web`.
+
+- [Data, kelompok spesimen, anotasi dan split](docs/dataset-guide.md)
+- [Lingkungan server, training, resume dan ekspor](docs/server-training.md)
+- [Kontrak dan pemasangan bundle web](docs/model-integration.md)
+
+Untuk memakai audit/persiapan data saja, dependency ringan cukup Pillow dan
+jsonschema sesuai rentang `training/requirements.txt`; GPU tidak diperlukan.
+`python -m unittest discover -s training/tests -v` menggunakan gambar sintetis
+di direktori sementara, tidak menyentuh koleksi asli.
+
+Urutan kerja: pulihkan sumber -> audit/anotasi -> split per kelompok -> siapkan
+detector dan ROI -> training server -> evaluasi/kalibrasi -> ekspor ONNX ->
+pasang bundle -> ukur akurasi dan kecepatan pada browser/perangkat sebenarnya.
+
 ## Aset dan sumber pengetahuan
 
 Foto katalog adalah salinan foto proyek SKRIPSI_ALYA yang dioptimalkan untuk web.

@@ -1,0 +1,7 @@
+{
+  "opset": 17,
+  "detectorInputSize": 416,
+  "cropMargin": 0.1,
+  "precision": "float32",
+  "note": "Ambang confidence harus berasal dari laporan kalibrasi validasi, bukan config contoh."
+}

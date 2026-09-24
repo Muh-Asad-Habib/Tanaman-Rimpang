@@ -1,0 +1,16 @@
+{
+  "architecture": "tf_efficientnetv2_b0.in1k",
+  "inputSize": 224,
+  "cbam": true,
+  "cbamReduction": 16,
+  "cbamKernel": 7,
+  "mean": [0.5, 0.5, 0.5],
+  "std": [0.5, 0.5, 0.5],
+  "epochs": 50,
+  "batchSize": 32,
+  "learningRate": 0.0001,
+  "weightDecay": 0.0001,
+  "patience": 10,
+  "workers": 4,
+  "seed": 42
+}
