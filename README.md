@@ -1,11 +1,34 @@
-# Rimpang
+# Tanaman Rimpang
 
-Web editorial untuk mengenal sepuluh jenis rimpang hasil panen. Next.js App Router,
-TypeScript dan Tailwind, dengan kamera/foto lokal serta integrasi ONNX Runtime Web.
+Web pengenalan 10 jenis rimpang hasil panen dengan tampilan responsif untuk
+desktop, tablet, dan HP. Tersedia katalog, pencarian, detail tanaman,
+pratinjau kamera/foto lokal, dan demo hasil multiobjek.
+
+**Status:** sistem web dan toolkit training sudah tersedia. Model belum dilatih;
+demo hanya ilustrasi, bukan hasil identifikasi.
+
+## Arsitektur dan algoritma
+
+| Bagian | Teknologi / fungsi |
+| --- | --- |
+| Web | Next.js App Router, TypeScript, Tailwind CSS |
+| Inferensi | ONNX Runtime Web di browser, WebGPU atau WASM |
+| Training server | Python, PyTorch, Ultralytics, timm |
+
+```text
+Kamera / foto -> YOLO11n -> crop objek -> EfficientNetV2-B0 + CBAM -> hasil
+```
+
+- **YOLO11n:** menemukan posisi rimpang.
+- **EfficientNetV2-B0:** mengklasifikasikan 10 jenis rimpang.
+- **CBAM:** attention pada fitur sebelum klasifikasi.
+
+Sistem disiapkan untuk maksimal 5 objek sekaligus. Foto/video tidak dikirim
+ke server; ketepatan dan kecepatan inferensi diukur setelah model dilatih.
 
 ## Menjalankan web
 
-Node.js >=22.18 direkomendasikan. Dari direktori proyek:
+Gunakan Node.js 22.18 atau lebih baru. Dari root proyek:
 
 ```powershell
 Set-Location web
@@ -13,71 +36,27 @@ npm ci
 npm run dev
 ```
 
-Buka http://localhost:3000. Untuk produksi: `npm run build`, lalu `npm start`.
-Script `predev`/`prebuild` menyiapkan aset ONNX Runtime dari paket dengan versi
-yang sama. Jalankan `npm run lint`, `npm run typecheck`, dan `npm test` untuk
-pemeriksaan kode. Font dan gambar disajikan lokal, tidak melalui hotlink.
+Buka **http://localhost:3000**. Produksi: `npm run build`, lalu `npm start`.
+Kamera membutuhkan **HTTPS atau localhost**.
 
-## Status model
+## Struktur proyek
 
-**Belum ada model terlatih.** Kamera dan foto berfungsi sebagai pratinjau, bukan
-identifikasi. Mode demo memiliki anotasi ilustrasi yang jelas, tidak menggunakan
-foto/kamera pengguna, dan tidak menjadi bukti akurasi.
+```text
+web/        Aplikasi Next.js dan inferensi browser
+shared/     Daftar kelas dan kontrak data/model
+training/   Persiapan dataset, training, dan ekspor ONNX
+data/       Sumber, anotasi, dan dataset
+artifacts/  Hasil training dan bundle model
+docs/       Panduan teknis
+```
 
-Integrasi disiapkan untuk YOLO11n deteksi generik -> crop -> EfficientNetV2-B0
-+ CBAM, sepuluh kelas, maksimal lima objek. Target frekuensi dan akurasi harus
-diukur setelah training. Confidence bukan jaminan kebenaran maupun keamanan konsumsi.
+Training dijalankan terpisah di server. Alurnya: siapkan dataset dan anotasi ->
+split per kelompok -> training -> evaluasi -> ekspor ONNX -> pasang model ke web.
 
-`web/public/models/manifest.json` sengaja menyatakan `status: unavailable`.
-Jangan menggantinya menjadi ready tanpa bundle trained dengan kelas, preprocessing,
-checksum dan output yang sesuai `shared/model-manifest.schema.json`.
+Panduan: [dataset](docs/dataset-guide.md) · [training server](docs/server-training.md) ·
+[integrasi model](docs/model-integration.md) · [arsitektur](docs/architecture.md).
 
-## Struktur
+## Lisensi
 
-- `web`: halaman, kamera, katalog dan runtime inference browser.
-- `shared`: urutan kelas dan kontrak bundle/data untuk TypeScript serta Python.
-- `training`: toolkit training server; tidak dijalankan saat web dimulai.
-- `data`: lokasi sumber/anotasi/manifest dan turunan dataset, bukan data fiktif.
-- `artifacts`: keluaran training/ekspor, diabaikan git.
-- `docs`: dokumentasi arsitektur, desain dan persiapan server.
-
-## Kamera dan privasi
-
-Kamera memerlukan HTTPS atau localhost. HTTP melalui IP LAN bukan secure context
-untuk kamera HP. Akses dari HP ke hosting perlu HTTPS yang valid; jangan mematikan
-pengamanan browser. Tidak ada API upload/predict, perekaman atau telemetry gambar.
-Browser masih membutuhkan jaringan untuk membuka situs/mengunduh aset.
-
-Preview/hasil diproses dalam memori dan dibersihkan saat sesi berganti. WebGPU
-dipakai jika model dan perangkat mendukung; WASM single-thread adalah fallback
-yang dinyatakan, bukan janji realtime di setiap HP.
-
-## Data dan training di server
-
-Training sengaja ditunda. Tidak ada dataset pulihan, bobot terlatih, atau hasil
-akurasi baru yang disertakan. Jalankan semua modul Python dari root proyek,
-bukan dari folder `web`.
-
-- [Data, kelompok spesimen, anotasi dan split](docs/dataset-guide.md)
-- [Lingkungan server, training, resume dan ekspor](docs/server-training.md)
-- [Kontrak dan pemasangan bundle web](docs/model-integration.md)
-
-Untuk memakai audit/persiapan data saja, dependency ringan cukup Pillow dan
-jsonschema sesuai rentang `training/requirements.txt`; GPU tidak diperlukan.
-`python -m unittest discover -s training/tests -v` menggunakan gambar sintetis
-di direktori sementara, tidak menyentuh koleksi asli.
-
-Urutan kerja: pulihkan sumber -> audit/anotasi -> split per kelompok -> siapkan
-detector dan ROI -> training server -> evaluasi/kalibrasi -> ekspor ONNX ->
-pasang bundle -> ukur akurasi dan kecepatan pada browser/perangkat sebenarnya.
-
-## Aset dan sumber pengetahuan
-
-Foto katalog adalah salinan foto proyek SKRIPSI_ALYA yang dioptimalkan untuk web.
-Cutout dekoratif bukan data training. Lihat `docs/asset-provenance.md`. Tautan
-Kew Plants of the World Online pada detail adalah rujukan taksonomi, bukan
-validasi foto/dataset. Beberapa nama lokal memerlukan peninjauan ahli.
-
-Situs ini tidak menyediakan diagnosis, dosis atau jaminan keamanan konsumsi.
-Tinjau hak pemakaian dataset, foto, Ultralytics dan pretrained weights sebelum
-mendistribusikan produk. Repo ini tidak memberi lisensi baru atas aset sumber.
+Kode proyek menggunakan [MIT License](LICENSE).
+Dependensi dan aset pihak ketiga tetap mengikuti lisensi masing-masing.
