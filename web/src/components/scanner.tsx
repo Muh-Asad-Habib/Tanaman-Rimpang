@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { InferenceEngine, type EngineState } from "@/lib/inference/engine";
 import type { FrameResult } from "@/lib/inference/contracts";
 import { plants } from "@/lib/catalog";
+import { fitPreview } from "@/lib/preview-layout";
 import { Icon } from "./icons";
 
 type Mode = "camera" | "photo" | "demo";
@@ -24,11 +25,13 @@ export function Scanner() {
   const [error, setError] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
   const [ratio, setRatio] = useState(4 / 3);
+  const [stageRatio, setStageRatio] = useState(4 / 3);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState("");
   const [state, setState] = useState<EngineState>({ status: "loading", message: "Memeriksa ketersediaan model..." });
   const [result, setResult] = useState<FrameResult | null>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const stage = useRef<HTMLDivElement>(null);
   const image = useRef<HTMLImageElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const objectUrl = useRef<string | null>(null);
@@ -71,6 +74,29 @@ export function Scanner() {
       document.removeEventListener("visibilitychange", visibility);
     };
   }, [clearPhoto, stop]);
+
+  useEffect(() => {
+    const container = stage.current;
+    const preview = video.current;
+    if (!container || !preview) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      if (width > 0 && height > 0) setStageRatio(width / height);
+    });
+    const resizeVideo = () => {
+      if (modeRef.current !== "camera" || !stream.current || !preview.videoWidth || !preview.videoHeight) return;
+      setRatio(preview.videoWidth / preview.videoHeight);
+      // Camera rotation invalidates coordinates from the previous frame geometry.
+      engine.current?.reset();
+      setResult(null);
+    };
+    observer.observe(container);
+    preview.addEventListener("resize", resizeVideo);
+    return () => {
+      observer.disconnect();
+      preview.removeEventListener("resize", resizeVideo);
+    };
+  }, []);
 
   useEffect(() => {
     if (state.status !== "ready" || mode === "demo" || (!active && !photo)) return;
@@ -151,16 +177,15 @@ export function Scanner() {
     }
   }
   const count = mode === "demo" ? demoObjects.length : result?.objects.length ?? 0;
-  const surfaceStyle = { width: ratio >= 4 / 3 ? "100%" : `${ratio / (4 / 3) * 100}%`,
-    height: ratio >= 4 / 3 ? `${(4 / 3) / ratio * 100}%` : "100%" };
+  const surfaceStyle = fitPreview(ratio, stageRatio);
 
   return <><div className="scanner-grid"><div>
     <div className="scanner-workspace"><div className="workspace-toolbar"><div className="scanner-tabs">
       <button className="scanner-tab" aria-pressed={mode === "camera"} onClick={() => changeMode("camera")}><Icon name="camera" size={16} />Kamera</button>
       <button className="scanner-tab" aria-pressed={mode === "photo"} onClick={() => changeMode("photo")}><Icon name="upload" size={16} />Foto lokal</button>
-    </div><span className="eyebrow" style={{ fontSize: 8 }}>RUANG PINDAI</span></div>
+    </div><span className="eyebrow workspace-label">RUANG PINDAI</span></div>
       {mode === "demo" && <div className="demo-banner" role="status"><Icon name="info" size={15} />Demo tampilan — bukan hasil identifikasi model</div>}
-      <div className="scanner-stage">
+      <div ref={stage} className={`scanner-stage${mode !== "demo" && !active && !photo ? " scanner-stage-idle" : ""}`}>
         <div className="frame-surface" style={surfaceStyle}>
           <video ref={video} hidden={mode !== "camera" || !active} autoPlay playsInline muted aria-label="Pratinjau kamera lokal" />
           {mode === "photo" && photo && <Image ref={image} src={photo} alt="Pratinjau foto yang dipilih dari perangkat" width={Math.round(ratio * 1000)} height={1000} unoptimized />}

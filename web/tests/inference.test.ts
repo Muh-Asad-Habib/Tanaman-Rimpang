@@ -4,6 +4,7 @@ import labels from "../../shared/labels.json";
 import { parseManifest } from "../src/lib/inference/manifest";
 import { FrameGate } from "../src/lib/inference/scheduler";
 import { ObjectTracker } from "../src/lib/inference/tracking";
+import { fitPreview } from "../src/lib/preview-layout";
 import { decodeDetector, intersectionOverUnion, letterboxGeometry, nonMaxSuppression, paddedCrop, softmax } from "../src/lib/inference/postprocess";
 
 const artifact = { file: "detector.onnx", sha256: "a".repeat(64), inputName: "images", outputName: "output0", inputSize: 320, dtype: "float32" };
@@ -46,6 +47,28 @@ test("letterbox and inverse coordinates preserve original frame aspect", () => {
   assert.equal(portrait.left, 70);
   assert.throws(() => letterboxGeometry(0, 1, 320));
   assert.throws(() => decodeDetector(values, [1, 6, 1], geometry, 0.2, 0.5));
+});
+test("preview preserves image and overlay geometry through screen and camera rotation", () => {
+  for (const [stageWidth, stageHeight] of [[290, 240], [730, 336], [640, 480], [820, 180]]) {
+    for (const frameRatio of [4 / 3, 3 / 4, 16 / 9, 9 / 16, 1]) {
+      const fit = fitPreview(frameRatio, stageWidth / stageHeight);
+      const width = parseFloat(fit.width) / 100 * stageWidth;
+      const height = parseFloat(fit.height) / 100 * stageHeight;
+      assert.ok(Math.abs(width / height - frameRatio) < 1e-10);
+      assert.ok(width <= stageWidth + 1e-10 && height <= stageHeight + 1e-10);
+      assert.ok(Math.abs(width - stageWidth) < 1e-10 || Math.abs(height - stageHeight) < 1e-10);
+      const box = { x: 0.1, y: 0.2, width: 0.5, height: 0.6 };
+      const offsetX = (stageWidth - width) / 2;
+      const offsetY = (stageHeight - height) / 2;
+      assert.ok(offsetX + (box.x + box.width) * width <= stageWidth);
+      assert.ok(offsetY + (box.y + box.height) * height <= stageHeight);
+    }
+  }
+  assert.deepEqual(fitPreview(1, 1), { width: "100%", height: "100%" });
+  for (const invalid of [0, -1, NaN, Infinity]) {
+    assert.throws(() => fitPreview(invalid, 1));
+    assert.throws(() => fitPreview(1, invalid));
+  }
 });
 test("NMS keeps separate objects and clamps crop padding", () => {
   const a = { box: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 }, score: 0.8 };

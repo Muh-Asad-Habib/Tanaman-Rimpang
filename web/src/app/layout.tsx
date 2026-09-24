@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -13,6 +13,13 @@ const displayFont = localFont({ src: [
 export const metadata: Metadata = {
   title: { default: "Rimpang — Kenali dari akarnya", template: "%s | Rimpang" },
   description: "Jelajahi sepuluh jenis rimpang Nusantara. Kenali ciri, temukan perbedaannya, dan siapkan pengenalan lokal melalui kamera.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f8f6f0",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

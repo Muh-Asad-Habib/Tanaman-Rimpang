@@ -5,7 +5,7 @@ import { PlantCard } from "@/components/plant-card";
 import { plants } from "@/lib/catalog";
 
 export default function Home() {
-  return <main id="konten">
+  return <main id="konten" tabIndex={-1}>
     <section className="container hero">
       <div className="hero-copy"><p className="eyebrow"><span className="small-line" /> DARI TANAH, UNTUK KITA</p>
         <h1>Serupa bentuknya.<br /><em>Berbeda ceritanya.</em></h1>
