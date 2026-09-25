@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import labels from "../../shared/labels.json";
-import { parseManifest } from "../src/lib/inference/manifest";
+import { fetchManifest, parseManifest } from "../src/lib/inference/manifest";
 import { FrameGate } from "../src/lib/inference/scheduler";
 import { ObjectTracker } from "../src/lib/inference/tracking";
 import { fitPreview } from "../src/lib/preview-layout";
@@ -37,6 +37,39 @@ test("ready contract validates exact labels, hashes, shapes and normalization", 
     assert.throws(() => parseManifest(candidate));
   }
 });
+test("availability and inference read the same uncached, validated manifest", async (context) => {
+  let payload: unknown = { schemaVersion: 1, labelsVersion: 1, status: "unavailable", reason: "Bundle belum dipasang." };
+  const request = context.mock.method(globalThis, "fetch", async () => Response.json(payload));
+  const controller = new AbortController();
+  const unavailable = await fetchManifest(controller.signal);
+  assert.equal(unavailable.status, "unavailable");
+  assert.equal(request.mock.calls[0].arguments[0], "/models/manifest.json");
+  assert.deepEqual(request.mock.calls[0].arguments[1], { cache: "no-store", signal: controller.signal });
+
+  payload = readyManifest();
+  assert.equal((await fetchManifest()).status, "ready");
+  assert.equal(request.mock.callCount(), 2);
+
+  payload = { ...readyManifest(), classSlugs: ["wrong-order"] };
+  await assert.rejects(fetchManifest(), /Kontrak model tidak valid/);
+});
+test("manifest fetch failures are not reported as unavailable or ready", async (context) => {
+  const request = context.mock.method(globalThis, "fetch", async () => new Response("", { status: 503 }));
+  await assert.rejects(fetchManifest(), /Manifest model tidak dapat dibuka \(503\)/);
+  request.mock.mockImplementation(async () => new Response("not json"));
+  await assert.rejects(fetchManifest(), SyntaxError);
+  request.mock.mockImplementation(async () => { throw new TypeError("Network unavailable"); });
+  await assert.rejects(fetchManifest(), /Network unavailable/);
+});
+test("manifest cancellation remains available to unmount and retry cleanup", async (context) => {
+  context.mock.method(globalThis, "fetch", async (_input: string | URL | Request, init?: RequestInit) => {
+    if (init?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    return Response.json(readyManifest());
+  });
+  const controller = new AbortController();
+  controller.abort();
+  await assert.rejects(fetchManifest(controller.signal), { name: "AbortError" });
+});
 test("letterbox and inverse coordinates preserve original frame aspect", () => {
   const geometry = letterboxGeometry(640, 360, 320);
   assert.equal(geometry.top, 70);
@@ -49,7 +82,7 @@ test("letterbox and inverse coordinates preserve original frame aspect", () => {
   assert.throws(() => decodeDetector(values, [1, 6, 1], geometry, 0.2, 0.5));
 });
 test("preview preserves image and overlay geometry through screen and camera rotation", () => {
-  for (const [stageWidth, stageHeight] of [[290, 240], [730, 336], [640, 480], [820, 180]]) {
+  for (const [stageWidth, stageHeight] of [[286, 230], [354, 265.5], [718, 430], [730, 336], [640, 480], [975, 522], [820, 180]]) {
     for (const frameRatio of [4 / 3, 3 / 4, 16 / 9, 9 / 16, 1]) {
       const fit = fitPreview(frameRatio, stageWidth / stageHeight);
       const width = parseFloat(fit.width) / 100 * stageWidth;

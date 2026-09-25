@@ -1,6 +1,12 @@
 import taxonomy from "../../../../shared/labels.json";
 import type { Artifact, Manifest } from "./contracts";
 
+export async function fetchManifest(signal?: AbortSignal): Promise<Manifest> {
+  const response = await fetch("/models/manifest.json", { cache: "no-store", signal });
+  if (!response.ok) throw new Error(`Manifest model tidak dapat dibuka (${response.status}).`);
+  return parseManifest(await response.json());
+}
+
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }

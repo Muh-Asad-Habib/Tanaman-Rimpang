@@ -178,40 +178,56 @@ export function Scanner() {
   }
   const count = mode === "demo" ? demoObjects.length : result?.objects.length ?? 0;
   const surfaceStyle = fitPreview(ratio, stageRatio);
+  const sourceLabel = mode === "demo" ? "Demo tampilan" : mode === "photo" ? "Foto lokal"
+    : requesting ? "Menunggu izin kamera" : active ? "Kamera aktif" : "Kamera nonaktif";
+  const emptyMessage = state.status === "ready"
+    ? active || photo ? "Belum ada objek. Letakkan rimpang utuh di dalam bingkai." : "Aktifkan kamera atau pilih foto untuk mulai mengenali."
+    : state.status === "loading" ? "Menunggu model siap. Kamera dan foto tetap bisa dipratinjau."
+    : "Belum ada prediksi. Kamera dan foto hanya pratinjau sampai model berhasil dimuat.";
 
-  return <><div className="scanner-grid"><div>
-    <div className="scanner-workspace"><div className="workspace-toolbar"><div className="scanner-tabs">
-      <button className="scanner-tab" aria-pressed={mode === "camera"} onClick={() => changeMode("camera")}><Icon name="camera" size={16} />Kamera</button>
-      <button className="scanner-tab" aria-pressed={mode === "photo"} onClick={() => changeMode("photo")}><Icon name="upload" size={16} />Foto lokal</button>
-    </div><span className="eyebrow workspace-label">RUANG PINDAI</span></div>
+  return <div className="scanner-grid">
+    <section className="scanner-workspace" aria-label="Kamera dan foto lokal">
+      <div className="workspace-toolbar">
+        <span className="workspace-source" role="status"><span className={`source-dot${active ? " source-dot-active" : ""}`} />{sourceLabel}</span>
+        {active && devices.length > 1
+          ? <select className="camera-select" aria-label="Pilih kamera" value={deviceId} onChange={(event) => { setDeviceId(event.target.value); void startCamera(event.target.value); }}>{devices.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Kamera ${index + 1}`}</option>)}</select>
+          : <span className="workspace-limit">Maks. 5 objek</span>}
+      </div>
       {mode === "demo" && <div className="demo-banner" role="status"><Icon name="info" size={15} />Demo tampilan — bukan hasil identifikasi model</div>}
       <div ref={stage} className={`scanner-stage${mode !== "demo" && !active && !photo ? " scanner-stage-idle" : ""}`}>
         <div className="frame-surface" style={surfaceStyle}>
           <video ref={video} hidden={mode !== "camera" || !active} autoPlay playsInline muted aria-label="Pratinjau kamera lokal" />
           {mode === "photo" && photo && <Image ref={image} src={photo} alt="Pratinjau foto yang dipilih dari perangkat" width={Math.round(ratio * 1000)} height={1000} unoptimized />}
-          {mode !== "demo" && result?.objects.map((object) => <div key={object.trackId} className="object-box" style={position(object.box)}><span>{object.classId !== null ? plants[object.classId]?.name : object.status === "uncertain" ? "Belum yakin" : "Menganalisis"}</span></div>)}
+          {mode !== "demo" && result?.objects.map((object) => <div key={object.trackId} className="object-box" style={position(object.box)}><span>{object.trackId}. {object.classId !== null ? plants[object.classId]?.name : object.status === "uncertain" ? "Belum yakin" : "Menganalisis"}</span></div>)}
         </div>
-        {mode !== "demo" && !active && !photo && <div className="scanner-placeholder"><div className="viewfinder" /><span className="camera-symbol"><Icon name={mode === "camera" ? "camera" : "upload"} size={30} /></span><h2>{requesting ? "Menghubungkan kamera..." : mode === "camera" ? "Mulai dari satu rimpang." : "Lihat lebih dekat."}</h2><p>{requesting ? "Berikan izin kamera pada browser Anda." : mode === "camera" ? "Aktifkan kamera dan arahkan pada rimpang yang ingin Anda kenali." : "Pilih foto rimpang dari perangkat. Foto tidak dikirim ke server."}</p><span className="stage-badge">PRATINJAU LOKAL · PRIVASI TERJAGA</span></div>}
+        {mode !== "demo" && !active && !photo && <div className="scanner-placeholder">
+          <span className="camera-symbol"><Icon name={mode === "camera" ? "camera" : "upload"} size={28} /></span>
+          <h2>{requesting ? "Izinkan kamera di browser" : mode === "camera" ? "Kamera siap saat Anda siap." : "Pilih foto rimpang"}</h2>
+          <p>{requesting ? "Menunggu izin. Anda bisa membatalkan kapan saja." : mode === "camera" ? "Tekan Aktifkan kamera di bawah, lalu arahkan ke rimpang." : "Gunakan JPG, PNG, atau WebP dari perangkat Anda."}</p>
+        </div>}
         {mode === "demo" && <div className="demo-scene">{demoObjects.map(({ plant, box }) => <div key={plant.id} className="demo-specimen" style={position(box)}><Image src={plant.image} alt={`Contoh ${plant.name}`} fill sizes="(max-width: 800px) 35vw, 250px" /></div>)}{demoObjects.map(({ plant, box }, i) => <div key={plant.id} className="object-box" style={position(box)}><span>{i + 1}. {plant.name} · contoh</span></div>)}<span className="demo-scene-note">Anotasi ilustrasi pada foto contoh, bukan keluaran model.</span></div>}
       </div>
       <div className="workspace-bottom"><div className="scanner-controls">
-        {mode === "camera" && <button className={`button ${active || requesting ? "button-outline" : "button-dark"}`} onClick={() => active || requesting ? stop() : void startCamera()}><Icon name={active || requesting ? "stop" : "camera"} size={16} />{requesting ? "Batalkan" : active ? "Hentikan kamera" : "Aktifkan kamera"}</button>}
-        {mode === "demo" && <button className="button button-dark" onClick={() => changeMode("camera")}><Icon name="camera" size={16} />Kembali ke kamera</button>}
-        <label className="button button-light file-label"><Icon name="upload" size={16} />{photo ? "Ganti foto" : "Pilih foto"}<input className="file-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Pilih foto rimpang" onChange={(event) => { void loadPhoto(event.target.files?.[0]); event.target.value = ""; }} /></label>
+        <button className={`button camera-action ${active || requesting ? "button-dark" : "button-primary"}`} onClick={() => active || requesting ? stop() : void startCamera()}><Icon name={active || requesting ? "stop" : "camera"} size={19} />{requesting ? "Batalkan" : active ? "Hentikan kamera" : "Aktifkan kamera"}</button>
+        <label className="button button-light file-label"><Icon name="upload" size={18} />{photo ? "Ganti foto" : "Pilih foto"}<input className="file-input" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Pilih foto rimpang" onChange={(event) => { void loadPhoto(event.target.files?.[0]); event.target.value = ""; }} /></label>
         {photo && <button className="icon-button" onClick={() => changeMode("photo")} aria-label="Hapus foto"><Icon name="close" size={16} /></button>}
-      </div>{active && devices.length > 1 && <select className="camera-select" aria-label="Pilih kamera" value={deviceId} onChange={(e) => { setDeviceId(e.target.value); void startCamera(e.target.value); }}>{devices.map((device, i) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Kamera ${i + 1}`}</option>)}</select>}
-        <p className="scanner-small-note">{mode === "demo" ? "Mode demo tidak menggunakan kamera maupun foto Anda." : "JPG, PNG, WebP · Maks. 10 MB · Tidak diunggah ke server"}</p>
       </div>
-    </div>{error && <div className="error-notice" role="alert">{error}</div>}
-  </div><aside className="scanner-sidebar">
-    <div className="model-notice" role="status"><Icon name={state.status === "ready" ? "check" : "info"} size={19} /><div><h2>{state.status === "ready" ? "Model tersedia di perangkat" : state.status === "loading" ? "Memeriksa model" : state.status === "error" ? "Model belum dapat dimuat" : "Model belum tersedia"}</h2><p>{state.message}</p>{state.status === "unavailable" && <p>Kamera dapat digunakan sebagai pratinjau. Belum ada prediksi nyata pada versi ini.</p>}<button className="retry-button" disabled={state.status === "loading"} onClick={() => { setResult(null); void engine.current?.initialize(); }}>Periksa kembali</button></div></div>
-    <div className="result-panel"><div className="result-panel-heading"><h2>{mode === "demo" ? "Contoh tampilan hasil" : "Hasil pengenalan"}</h2><span className="count-badge">{count} / 5 objek</span></div>
-      {!count && <div className="result-empty"><Icon name="leaf" size={35} /><p>{state.status === "ready" && (active || photo) ? "Arahkan pada rimpang. Objek yang dikenali akan muncul di sini." : "Belum ada hasil. Sambil menunggu model, Anda bisa menjelajahi katalog atau melihat demo."}</p></div>}
-      {mode === "demo" ? demoObjects.map(({ plant }) => <div className="result-item" key={plant.id}><div className="result-thumb"><Image src={plant.image} alt="" fill sizes="48px" /></div><div><h3>{plant.name}</h3><p>Anotasi contoh · bukan prediksi</p></div><Link href={`/jelajah/${plant.slug}`} aria-label={`Pelajari ${plant.name}`}><Icon name="diagonal" size={16} /></Link></div>)
+        {error && <div className="error-notice" role="alert">{error}</div>}
+        <p className="scanner-small-note">{mode === "demo" ? "Demo tidak menggunakan kamera atau foto Anda." : "Foto: maks. 10 MB / 32 MP · Diproses di perangkat"}</p>
+      </div>
+    </section>
+    <aside className="scanner-sidebar" aria-label="Status model dan hasil">
+    <div className="model-notice" data-status={state.status}><Icon name={state.status === "ready" ? "check" : "info"} size={18} /><div>
+      <div role="status"><h2>{state.status === "ready" ? "Model aktif di perangkat" : state.status === "loading" ? "Menyiapkan model" : state.status === "error" ? "Model gagal dimuat" : "Pratinjau saja"}</h2><p>{state.message}</p></div>
+      <button className="retry-button" disabled={state.status === "loading"} onClick={() => { setResult(null); void engine.current?.initialize(); }}>Periksa kembali</button>
+    </div></div>
+    <section className="result-panel" aria-labelledby="results-title"><div className="result-panel-heading"><h2 id="results-title">{mode === "demo" ? "Hasil ilustrasi" : "Hasil pengenalan"}</h2><span className="count-badge" aria-live="polite">{count} / 5 objek</span></div>
+      {!count && <div className="result-empty"><Icon name="scan" size={22} /><p>{emptyMessage}</p></div>}
+      {mode === "demo" ? demoObjects.map(({ plant }, index) => <div className="result-item" key={plant.id}><div className="result-thumb"><Image src={plant.image} alt="" fill sizes="40px" /></div><div><h3>{index + 1}. {plant.name}</h3><p>Contoh · bukan prediksi</p></div><Link href={`/jelajah/${plant.slug}`} aria-label={`Pelajari ${plant.name}`}><Icon name="diagonal" size={16} /></Link></div>)
         : result?.objects.map((object) => <div className="result-item" key={object.trackId}><div><h3>{object.classId !== null ? plants[object.classId]?.name : object.status === "uncertain" ? "Objek belum dikenali" : "Menganalisis objek"}</h3><p>Objek {object.trackId}{object.confidence !== null ? ` · Skor model ${(object.confidence * 100).toFixed(0)}%` : " · Tunggu hasil stabil"}</p></div>{object.classId !== null && <Link href={`/jelajah/${plants[object.classId].slug}`} aria-label={`Pelajari ${plants[object.classId].name}`}><Icon name="diagonal" size={16} /></Link>}</div>)}
       {mode !== "demo" && result?.overflow && <p className="scanner-small-note">Maksimal 5 objek. Kurangi jumlah rimpang dalam bingkai.</p>}
-    </div>
-    {mode !== "demo" && <button className="button button-outline scanner-demo-button" onClick={() => changeMode("demo")}>Lihat demo tampilan <Icon name="arrow" size={17} /></button>}
-    <div className="scanner-tip"><Icon name="sun" size={19} /><p>Letakkan rimpang terpisah di permukaan polos. Cahaya yang merata membantu kamera melihat bentuknya.</p></div>
-  </aside></div><div className="scanner-bottom-note"><Icon name="shield" size={21} /><span>Foto tetap milik Anda. Tidak ada unggahan gambar maupun rekaman kamera.</span><Link href="/panduan">Baca panduan</Link></div></>;
+    </section>
+    <button className="scanner-demo-button" aria-pressed={mode === "demo"} onClick={() => changeMode(mode === "demo" ? "camera" : "demo")}>{mode === "demo" ? "Tutup demo" : "Lihat demo · ilustrasi"}<Icon name={mode === "demo" ? "close" : "arrow"} size={17} /></button>
+    <details className="scanner-tip"><summary><Icon name="sun" size={18} />Tips pemindaian<span aria-hidden="true">+</span></summary><p>Pisahkan rimpang di permukaan polos dengan cahaya merata. Jaga kamera stabil dan seluruh objek tetap di dalam bingkai.</p><Link href="/panduan" className="text-link">Panduan & privasi<Icon name="arrow" size={16} /></Link></details>
+  </aside></div>;
 }

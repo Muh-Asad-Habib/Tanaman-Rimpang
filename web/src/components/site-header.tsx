@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./icons";
 
-const links = [{ href: "/", text: "Beranda" }, { href: "/jelajah", text: "Jelajahi rimpang" }, { href: "/panduan", text: "Panduan" }];
+const links = [{ href: "/jelajah", text: "Katalog rimpang" }, { href: "/panduan", text: "Panduan" }];
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -49,17 +49,17 @@ export function SiteHeader() {
   return <header ref={header} className="site-header">
     <div className="container header-inner">
       <Link href="/" className="brand" aria-label="Rimpang, beranda" onClick={() => setOpen(false)}>
-        <span className="brand-mark"><Icon name="leaf" size={23} /></span>rimpang<span className="brand-dot">.</span>
+        <span className="brand-mark"><Icon name="leaf" size={23} /></span>rimpang
       </Link>
       <nav className="desktop-nav" aria-label="Navigasi utama">
         {links.map((item) => <Link key={item.href} href={item.href} aria-current={currentPage(item.href)}>{item.text}</Link>)}
       </nav>
-      <Link href="/pindai" className="button button-dark header-cta" onClick={() => setOpen(false)}><Icon name="scan" size={17} /> Mulai pindai <Icon name="diagonal" size={16} /></Link>
+      <Link href="/pindai" className="button button-outline header-cta" aria-current={currentPage("/pindai")} onClick={() => setOpen(false)}><Icon name="camera" size={17} /> Pindai</Link>
       <button ref={toggle} className="mobile-menu icon-button" aria-label={open ? "Tutup menu" : "Buka menu"}
         aria-expanded={open} aria-controls="mobile-navigation" onClick={() => setOpen(!open)}><Icon name={open ? "close" : "menu"} /></button>
     </div>
     <nav id="mobile-navigation" className="mobile-nav" aria-label="Navigasi mobile" hidden={!open}>
-      {[...links, { href: "/pindai", text: "Mulai pindai" }].map((item) => <Link key={item.href} href={item.href}
+      {[{ href: "/", text: "Beranda" }, ...links, { href: "/pindai", text: "Mulai pindai" }].map((item) => <Link key={item.href} href={item.href}
         aria-current={currentPage(item.href)} onClick={() => setOpen(false)}>{item.text}<Icon name="arrow" size={16} /></Link>)}
     </nav>
   </header>;

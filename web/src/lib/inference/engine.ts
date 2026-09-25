@@ -1,4 +1,4 @@
-import { parseManifest } from "./manifest";
+import { fetchManifest } from "./manifest";
 import { FrameGate } from "./scheduler";
 import type { FrameResult, Provider, WorkerRequest, WorkerResponse } from "./contracts";
 
@@ -35,9 +35,7 @@ export class InferenceEngine {
     this.controller = new AbortController();
     this.report({ status: "loading", message: "Memeriksa ketersediaan model..." });
     try {
-      const response = await fetch("/models/manifest.json", { cache: "no-store", signal: this.controller.signal });
-      if (!response.ok) throw new Error(`Manifest model tidak dapat dibuka (${response.status}).`);
-      const manifest = parseManifest(await response.json());
+      const manifest = await fetchManifest(this.controller.signal);
       if (generation !== this.generation || this.disposed) return;
       if (manifest.status === "unavailable") {
         this.report({ status: "unavailable", message: manifest.reason });

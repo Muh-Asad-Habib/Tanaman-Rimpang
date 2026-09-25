@@ -11,15 +11,15 @@ const displayFont = localFont({ src: [
 ], variable: "--font-display", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "Rimpang — Kenali dari akarnya", template: "%s | Rimpang" },
-  description: "Jelajahi sepuluh jenis rimpang Nusantara. Kenali ciri, temukan perbedaannya, dan siapkan pengenalan lokal melalui kamera.",
+  title: { default: "Rimpang — Kenali lewat kamera", template: "%s | Rimpang" },
+  description: "Ruang pengenalan 10 jenis rimpang melalui kamera dan foto lokal. Gambar tetap di perangkat, dengan katalog dan panduan untuk belajar.",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f8f6f0",
+  themeColor: "#f5f6f1",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
