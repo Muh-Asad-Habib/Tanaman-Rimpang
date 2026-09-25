@@ -27,6 +27,9 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--config", type=Path, default=ROOT / "training" / "configs" / "export.json")
+    parser.add_argument("--experimental", action="store_true", help=(
+        "Accept calibration-diagnostic.json from unreviewed automatic annotations. Thresholds are still "
+        "valid-selected and checkpoint-bound; the manifest is marked experimental."))
     args = parser.parse_args()
     config = read_json(args.config)
     if args.output.exists():
@@ -35,8 +38,15 @@ def main():
         parser.error("Browser contract v1 supports float32 only.")
     slugs = [label["slug"] for label in taxonomy()["labels"]]
     try:
-        calibration, _, _ = verify_calibration_evidence(
-            args.calibration, digest(args.detector), digest(args.classifier), config, slugs)
+        if args.experimental:
+            calibration = read_json(args.calibration)
+            if (calibration.get("detectorCheckpointSha256") != digest(args.detector)
+                    or calibration.get("classifierCheckpointSha256") != digest(args.classifier)
+                    or calibration.get("classSlugs") != slugs or calibration.get("split") != "valid"):
+                raise ValueError("Diagnostic calibration is not bound to these checkpoints/classes.")
+        else:
+            calibration, _, _ = verify_calibration_evidence(
+                args.calibration, digest(args.detector), digest(args.classifier), config, slugs)
     except (ValueError, OSError, KeyError, TypeError) as error:
         parser.error(str(error))
     import numpy as np
@@ -55,7 +65,7 @@ def main():
             or calibration.get("classifierStd") != model_config["std"]):
         parser.error("Classifier configuration/normalization differs from calibration.")
     unmet = checkpoint_eligibility(checkpoint, detector_checkpoint_binding(args.detector), calibration["datasetBinding"], config)
-    if unmet:
+    if unmet and not args.experimental:
         parser.error("Checkpoint provenance is not eligible for export: " + "; ".join(unmet))
     if not model_config["cbam"]:
         parser.error("The production hybrid bundle requires CBAM; keep ablation results separate.")
@@ -122,6 +132,10 @@ def main():
                 "scoreThreshold": calibration["classifierScoreThreshold"], "minMargin": calibration["minMargin"],
             },
         }
+        if args.experimental:
+            manifest["experimental"] = True
+            manifest["reason"] = ("Eksperimental: kotak dibuat otomatis dan kelas diambil dari nama folder "
+                                  "tanpa review manusia. Hasil bisa keliru.")
         validate_schema(manifest, "model-manifest.schema.json")
         output = stage / "bundle"
         output.mkdir()

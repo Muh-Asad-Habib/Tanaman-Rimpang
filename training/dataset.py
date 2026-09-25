@@ -7,30 +7,40 @@ from PIL import Image, ImageOps
 from training.common import SPLITS, digest, source_path, taxonomy, validate_schema
 
 
-def audit_manifest(manifest, data_root):
+def _inspect_image(image_path):
+    if image_path.stat().st_size == 0:
+        raise ValueError(f"Empty image: {image_path}")
+    with Image.open(image_path) as original:
+        original.load()
+        orientation = original.getexif().get(274, 1)
+        size = original.size
+    return digest(image_path), orientation, size
+
+
+def audit_manifest(manifest, data_root, workers=8):
     validate_schema(manifest, "dataset-manifest.schema.json")
     seen_paths, seen_hashes, group_splits = set(), {}, {}
     records, counts = [], Counter()
-    for item in manifest["images"]:
-        image_path = source_path(data_root, item["path"])
+    paths = [source_path(data_root, item["path"]) for item in manifest["images"]]
+    if workers > 1 and len(paths) > 64:
+        from multiprocessing import get_context
+        with get_context("spawn").Pool(workers) as pool:
+            inspected = pool.map(_inspect_image, paths, chunksize=16)
+    else:
+        inspected = [_inspect_image(path) for path in paths]
+    for item, image_path, (sha, orientation, size) in zip(manifest["images"], paths, inspected):
         if image_path in seen_paths:
             raise ValueError(f"Image referenced more than once: {item['path']}")
         seen_paths.add(image_path)
-        if image_path.stat().st_size == 0:
-            raise ValueError(f"Empty image: {item['path']}")
-        sha = digest(image_path)
         if sha in seen_hashes:
             raise ValueError(f"Exact duplicate image: {item['path']} and {seen_hashes[sha]}")
         seen_hashes[sha] = item["path"]
         if item.get("sha256", sha) != sha:
             raise ValueError(f"Checksum mismatch: {item['path']}")
-        with Image.open(image_path) as original:
-            original.load()
-            if original.getexif().get(274, 1) not in (1, None):
-                raise ValueError(f"Normalize EXIF orientation BEFORE annotation: {item['path']}")
-            image = original.convert("RGB")
-            if min(image.size) < 16:
-                raise ValueError(f"Image too small: {item['path']}")
+        if orientation not in (1, None):
+            raise ValueError(f"Normalize EXIF orientation BEFORE annotation: {item['path']}")
+        if min(size) < 16:
+            raise ValueError(f"Image too small: {item['path']}")
         group = item["groupId"].strip()
         if not group or not item["sourceId"].strip():
             raise ValueError("sourceId/groupId must not be blank.")
@@ -109,24 +119,45 @@ def crop_box(box, size, margin):
     )
 
 
-def prepare_images(records, data_root, destination, margin):
+DETECTOR_MAX_SIDE = 1280
+CROP_MAX_SIDE = 448
+
+
+def _prepare_one(job):
+    row, index, data_root, destination, margin, slugs = job
+    split, stem = row["split"], f"{index:06d}_{row['sha256'][:12]}"
+    with Image.open(source_path(data_root, row["path"])) as source:
+        image = ImageOps.exif_transpose(source).convert("RGB")
+    # Labels are normalized, so downscaling keeps them valid while making every epoch cheaper to decode.
+    detector_image = image.copy()
+    detector_image.thumbnail((DETECTOR_MAX_SIDE, DETECTOR_MAX_SIDE), Image.Resampling.LANCZOS)
+    detector_image.save(destination / "detector" / "images" / split / f"{stem}.jpg", quality=95)
+    yolo = []
+    for instance, obj in enumerate(row["objects"]):
+        x, y, width, height = obj["bbox"]
+        yolo.append(f"0 {x + width / 2:.9f} {y + height / 2:.9f} {width:.9f} {height:.9f}")
+        crop = image.crop(crop_box(obj["bbox"], image.size, margin))
+        if min(crop.size) < 8:
+            raise ValueError(f"ROI too small in {row['path']}; review annotation.")
+        crop.thumbnail((CROP_MAX_SIDE, CROP_MAX_SIDE), Image.Resampling.LANCZOS)
+        crop.save(destination / "classifier" / split / slugs[obj["classId"]] / f"{stem}_{instance}.jpg", quality=95)
+    (destination / "detector" / "labels" / split / f"{stem}.txt").write_text("\n".join(yolo) + ("\n" if yolo else ""), encoding="ascii")
+
+
+def prepare_images(records, data_root, destination, margin, workers=8):
     labels = taxonomy()["labels"]
     for split in SPLITS:
         for sub in ("images", "labels"):
             (destination / "detector" / sub / split).mkdir(parents=True)
         for label in labels:
             (destination / "classifier" / split / label["slug"]).mkdir(parents=True)
-    for index, row in enumerate(records):
-        split, stem = row["split"], f"{index:06d}_{row['sha256'][:12]}"
-        with Image.open(source_path(data_root, row["path"])) as source:
-            image = ImageOps.exif_transpose(source).convert("RGB")
-            image.save(destination / "detector" / "images" / split / f"{stem}.jpg", quality=95)
-            yolo = []
-            for instance, obj in enumerate(row["objects"]):
-                x, y, width, height = obj["bbox"]
-                yolo.append(f"0 {x + width / 2:.9f} {y + height / 2:.9f} {width:.9f} {height:.9f}")
-                crop = image.crop(crop_box(obj["bbox"], image.size, margin))
-                if min(crop.size) < 8:
-                    raise ValueError(f"ROI too small in {row['path']}; review annotation.")
-                crop.save(destination / "classifier" / split / labels[obj["classId"]]["slug"] / f"{stem}_{instance}.jpg", quality=95)
-            (destination / "detector" / "labels" / split / f"{stem}.txt").write_text("\n".join(yolo) + ("\n" if yolo else ""), encoding="ascii")
+    slugs = [label["slug"] for label in labels]
+    jobs = [(row, index, data_root, destination, margin, slugs) for index, row in enumerate(records)]
+    if workers <= 1:
+        for job in jobs:
+            _prepare_one(job)
+        return
+    from multiprocessing import get_context
+    with get_context("spawn").Pool(workers) as pool:
+        for _ in pool.imap_unordered(_prepare_one, jobs, chunksize=8):
+            pass
