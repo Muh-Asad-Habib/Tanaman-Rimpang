@@ -12,7 +12,7 @@ from PIL import Image, ImageFile
 
 from training.common import digest, read_json, taxonomy
 from training.ingestion import (
-    EXPECTED_COUNTS, EXPECTED_PROVENANCE, FOLDER_ID, METADATA_IDS,
+    EXPECTED_COUNTS, EXPECTED_PROVENANCE, FOLDER_ID, METADATA_IDS, DirectDriveDownloader,
     IngestionError, _normalize, _workspace, audit_raw_dataset, download_dataset, infer_provenance,
     parse_mapping, safe_relative,
 )
@@ -25,6 +25,52 @@ def image_bytes(color, *, size=(32, 24), orientation=1, format="JPEG"):
     exif[274] = orientation
     image.save(stream, format=format, exif=exif)
     return stream.getvalue()
+
+
+class FakeResponse:
+    def __init__(self, status, kind, body):
+        self.status_code, self.headers, self.body = status, {"Content-Type": kind}, body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def iter_content(self, _size):
+        yield self.body
+
+
+class DirectDownloaderTests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path.cwd() / f".direct-test-{uuid.uuid4().hex}"
+        self.root.mkdir()
+        self.sleeps = []
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def downloader(self, responses):
+        session = SimpleNamespace(calls=[], get=lambda url, **kwargs: (session.calls.append(kwargs), responses.pop(0))[1])
+        return DirectDriveDownloader(None, session=session, sleep=self.sleeps.append, clock=lambda: 0.0), session
+
+    def test_retries_rate_limit_html_then_writes_atomically(self):
+        downloader, session = self.downloader([
+            FakeResponse(200, "text/html; charset=utf-8", b"<html>quota</html>"),
+            FakeResponse(200, "image/jpeg", b"jpeg-bytes"),
+        ])
+        output = self.root / "a.jpg"
+        self.assertEqual(downloader.download(id="abc", output=str(output), timeout=(5, 5), retries=2), str(output))
+        self.assertEqual(output.read_bytes(), b"jpeg-bytes")
+        self.assertEqual(session.calls[0]["params"], {"id": "abc", "export": "download", "confirm": "t"})
+        self.assertIn(10.0, self.sleeps)
+        self.assertEqual(sorted(path.name for path in self.root.iterdir()), ["a.jpg"])
+
+    def test_gives_up_without_leaving_partial_files(self):
+        downloader, _ = self.downloader([FakeResponse(429, "text/plain", b"")] * 2)
+        with self.assertRaises(IngestionError):
+            downloader.download(id="abc", output=str(self.root / "a.jpg"), timeout=5, retries=1)
+        self.assertEqual(list(self.root.iterdir()), [])
 
 
 class FakeGdown:

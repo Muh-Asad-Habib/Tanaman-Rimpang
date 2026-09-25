@@ -12,6 +12,7 @@ import importlib.metadata
 import math
 import os
 import re
+import time
 import uuid
 import warnings
 from collections import Counter, defaultdict
@@ -404,7 +405,62 @@ def _get_downloader():
     if version != "6.4.0":
         raise IngestionError(f"Expected gdown==6.4.0, found {version}; install requirements-data.txt.")
     import gdown
-    return gdown
+    return DirectDriveDownloader(gdown)
+
+
+class DirectDriveDownloader:
+    """gdown folder discovery plus throttled direct file transfer.
+
+    gdown's per-file ``uc?id=`` flow is rejected with "many accesses" after a
+    few dozen anonymous requests; the public usercontent endpoint is not.
+    """
+
+    URL = "https://drive.usercontent.google.com/download"
+    DESCRIPTION = "gdown==6.4.0 folder listing; throttled drive.usercontent file transfer"
+
+    def __init__(self, lister, session=None, interval=0.5, backoff=10.0, sleep=time.sleep, clock=time.monotonic):
+        self.lister, self.interval, self.backoff = lister, interval, backoff
+        self.sleep, self.clock, self.last = sleep, clock, None
+        if session is None:
+            import requests
+            session = requests.Session()
+        self.session = session
+
+    def download_folder(self, **kwargs):
+        return self.lister.download_folder(**kwargs)
+
+    def _wait(self):
+        if self.last is not None:
+            remaining = self.interval - (self.clock() - self.last)
+            if remaining > 0:
+                self.sleep(remaining)
+        self.last = self.clock()
+
+    def download(self, *, id, output, timeout, retries, **_):
+        output = Path(output)
+        partial = output.with_name(output.name + ".part")
+        error = None
+        for attempt in range(retries + 1):
+            if attempt:
+                self.sleep(self.backoff * 2 ** (attempt - 1))
+            self._wait()
+            try:
+                with self.session.get(self.URL, params={"id": id, "export": "download", "confirm": "t"},
+                                      stream=True, timeout=timeout) as response:
+                    kind = response.headers.get("Content-Type", "")
+                    if response.status_code != 200 or kind.startswith("text/html"):
+                        raise IngestionError(f"Drive returned HTTP {response.status_code} ({kind or 'no type'}) for {id}.")
+                    with partial.open("wb") as stream:
+                        for chunk in response.iter_content(1 << 16):
+                            stream.write(chunk)
+                if partial.stat().st_size <= 0:
+                    raise IngestionError(f"Drive returned an empty file for {id}.")
+                os.replace(partial, output)
+                return str(output)
+            except Exception as caught:
+                error = caught
+                partial.unlink(missing_ok=True)
+        raise IngestionError(f"Direct Drive transfer failed after {retries + 1} attempts: {error}")
 
 
 def _check_current_metadata(root, rows, previous, downloader, timeout, retries):
@@ -524,7 +580,7 @@ def download_dataset(dataset_root, *, inventory_only=False, expectations=None,
             inventory = {
                 "schemaVersion": 1, "kind": "drive-image-inventory", "labelsVersion": taxonomy()["version"],
                 "folderId": FOLDER_ID, "folderUrl": f"https://drive.google.com/drive/folders/{FOLDER_ID}",
-                "downloader": "gdown==6.4.0", "useCookies": False,
+                "downloader": getattr(downloader, "DESCRIPTION", "gdown==6.4.0"), "useCookies": False,
                 "remoteContentChecksums": "not-provided",
                 "integrityScope": "Locally recovered bytes; stable Drive IDs do not prove immutable remote file revisions.",
                 "expectations": expected, "expectationsOverridden": expectations is not None,
