@@ -77,14 +77,14 @@ if ($Action -eq "Upload") {
     $archive = Join-Path $LocalTransfers "$SourceId.tar.gz"
     if (Test-Path -LiteralPath $archive) { throw "Source archive already exists: $archive" }
     $relative = [Collections.Generic.List[string]]::new()
-    foreach ($folder in @("training", "shared", "docs")) {
+    foreach ($folder in @("training", "shared")) {
         foreach ($file in Get-ChildItem -LiteralPath (Join-Path $Root $folder) -Recurse -File) {
             if ($file.FullName -match '[\\/]__pycache__[\\/]' -or
                 $file.Extension -notin @(".py", ".json", ".txt", ".md", ".ps1", ".sh", ".xml")) { continue }
             $relative.Add($file.FullName.Substring($Root.Length + 1))
         }
     }
-    foreach ($file in @("README.md", "LICENSE", "data\README.md", "data\sources.json")) {
+    foreach ($file in @("README.md", "LICENSE", "data\sources.json")) {
         $relative.Add($file)
     }
     $files = foreach ($name in $relative) {

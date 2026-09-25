@@ -14,11 +14,14 @@ data/annotations/**
 !data/annotations/.gitkeep
 data/prepared/**
 !data/prepared/.gitkeep
-artifacts/**
-!artifacts/README.md
+artifacts/
 *.pt
 *.pth
 *.onnx
 web/public/vendor/ort/
 web/test-results/
 web/.test-build/
+web/AGENTS.md
+web/CLAUDE.md
+plan.md
+.idea/
