@@ -5,6 +5,9 @@ import tempfile
 from pathlib import Path
 
 from training.common import ROOT, digest, read_json, taxonomy, write_json, validate_schema
+from training.evaluation import (
+    checkpoint_eligibility, detector_checkpoint_binding, json_fingerprint, verify_calibration_evidence,
+)
 
 
 def session_io(session, input_size):
@@ -25,20 +28,17 @@ def main():
     parser.add_argument("--version", required=True)
     parser.add_argument("--config", type=Path, default=ROOT / "training" / "configs" / "export.json")
     args = parser.parse_args()
-    config, calibration = read_json(args.config), read_json(args.calibration)
+    config = read_json(args.config)
     if args.output.exists():
         parser.error("Use a new output directory. Existing bundles are never overwritten.")
     if config["precision"] != "float32":
         parser.error("Browser contract v1 supports float32 only.")
-    if calibration.get("status") != "validated" or calibration.get("split") != "valid" or calibration.get("protocol") != "group-disjoint":
-        parser.error("Require actual group-disjoint validation calibration; test-set tuning is not accepted.")
-    if calibration.get("detectorCheckpointSha256") != digest(args.detector) or calibration.get("classifierCheckpointSha256") != digest(args.classifier):
-        parser.error("Calibration was not performed for these exact checkpoints.")
-    if calibration.get("cropMargin") != config["cropMargin"]:
-        parser.error("Crop margin differs from calibration.")
     slugs = [label["slug"] for label in taxonomy()["labels"]]
-    if calibration.get("classSlugs") != slugs:
-        parser.error("Calibration class order must match shared labels.")
+    try:
+        calibration, _, _ = verify_calibration_evidence(
+            args.calibration, digest(args.detector), digest(args.classifier), config, slugs)
+    except (ValueError, OSError, KeyError, TypeError) as error:
+        parser.error(str(error))
     import numpy as np
     import torch
     import onnx
@@ -50,6 +50,13 @@ def main():
     if checkpoint.get("classSlugs") != slugs or checkpoint.get("formatVersion") != 1 or checkpoint.get("epoch", -1) < 0:
         parser.error("Classifier checkpoint is incompatible or not trained.")
     model_config = checkpoint["config"]
+    if (calibration.get("classifierConfigSha256") != json_fingerprint(model_config)
+            or calibration.get("classifierMean") != model_config["mean"]
+            or calibration.get("classifierStd") != model_config["std"]):
+        parser.error("Classifier configuration/normalization differs from calibration.")
+    unmet = checkpoint_eligibility(checkpoint, detector_checkpoint_binding(args.detector), calibration["datasetBinding"], config)
+    if unmet:
+        parser.error("Checkpoint provenance is not eligible for export: " + "; ".join(unmet))
     if not model_config["cbam"]:
         parser.error("The production hybrid bundle requires CBAM; keep ablation results separate.")
     model = RimpangClassifier(model_config).eval()
@@ -122,8 +129,11 @@ def main():
         shutil.copyfile(classifier_path, output / "classifier.onnx")
         write_json(output / "manifest.json", manifest)
         write_json(output / "calibration.json", calibration)
+        for name in ("evaluation-report.json", "frozen-thresholds.json"):
+            shutil.copyfile(args.calibration.parent / name, output / name)
         output.rename(args.output)
-    print(f"Bundle exported: {args.output}. Real-image/browser parity and held-out evaluation remain required.")
+    print(f"Bundle exported: {args.output}. Held-out metrics are attached; real-image/browser parity "
+          "and human quality review remain required before activation.")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,28 @@ import argparse
 import random
 from pathlib import Path
 
-from training.common import ROOT, read_json, taxonomy, write_json
+from training.common import ROOT, digest, read_json, taxonomy
+from training.evaluation import atomic_json, atomic_write, finite_number, prepared_dataset_binding
+
+
+def validate_resume(checkpoint, config, class_slugs, dataset_binding, config_sha):
+    if (checkpoint.get("formatVersion") != 1 or checkpoint.get("config") != config
+            or checkpoint.get("classSlugs") != class_slugs
+            or checkpoint.get("datasetBinding") != dataset_binding
+            or checkpoint.get("configFileSha256") != config_sha):
+        raise ValueError("Resume configuration/classes/prepared dataset differ or provenance is missing; create a new experiment.")
+    epoch, history = checkpoint.get("epoch"), checkpoint.get("history")
+    if type(epoch) is not int or epoch < 0 or not isinstance(history, list) or len(history) != epoch + 1:
+        raise ValueError("Resume epoch/history is incomplete.")
+    best, stale = -1.0, 0
+    for index, row in enumerate(history):
+        if row.get("epoch") != index + 1:
+            raise ValueError("Resume history is not contiguous.")
+        score = finite_number(row.get("validMacroF1"), "history validation macro-F1", 0, 1)
+        stale = 0 if score > best else stale + 1
+        best = max(best, score)
+    if checkpoint.get("best") != best or type(checkpoint.get("stale")) is not int or checkpoint["stale"] != stale:
+        raise ValueError("Resume best/early-stop state does not match history.")
 
 
 def main():
@@ -11,14 +32,22 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--config", type=Path, default=ROOT / "training" / "configs" / "classifier.json")
     parser.add_argument("--device", default="cuda")
-    parser.add_argument("--resume", type=Path, help="Trusted last.pt from this experiment; restores optimizer and RNG.")
+    parser.add_argument("--resume", type=Path, help="Trusted last.pt from this experiment; restores optimizer and RNG. Pickles are executable.")
     args = parser.parse_args()
     config = read_json(args.config)
     class_slugs = [label["slug"] for label in taxonomy()["labels"]]
     if args.output.exists() and not args.resume:
         parser.error("Output exists; use a new experiment directory.")
-    if args.resume and args.resume.resolve().parent != args.output.resolve():
-        parser.error("Resume must use the same output directory as the original checkpoint.")
+    if args.resume and (args.resume.resolve().parent != args.output.resolve() or args.resume.name != "last.pt"):
+        parser.error("Resume must use last.pt in the original output directory.")
+    if args.data.resolve() != args.data.parent.resolve() / "classifier":
+        parser.error("--data must be the classifier directory inside a frozen prepared dataset.")
+    dataset_binding, _, inspection = prepared_dataset_binding(args.data.parent)
+    if dataset_binding["cropMargin"] != 0.1:
+        parser.error("Prepared crops must use the approved margin 0.1.")
+    if any(not count for split in inspection["splits"].values() for count in split["objectsPerClass"].values()):
+        parser.error("Prepared train/valid/test must all cover the existing ten classes.")
+    config_sha = digest(args.config)
     import numpy as np
     import torch
     from torch import nn
@@ -64,8 +93,7 @@ def main():
     history = []
     if args.resume:
         checkpoint = torch.load(args.resume, map_location="cpu", weights_only=False)
-        if checkpoint["config"] != config or checkpoint["classSlugs"] != class_slugs:
-            raise ValueError("Resume configuration/classes differ; create a new experiment instead.")
+        validate_resume(checkpoint, config, class_slugs, dataset_binding, config_sha)
         model.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         start, best, stale, history = checkpoint["epoch"] + 1, checkpoint["best"], checkpoint["stale"], checkpoint["history"]
@@ -76,7 +104,22 @@ def main():
         if checkpoint.get("cudaRng") is not None and torch.cuda.is_available():
             torch.cuda.set_rng_state_all(checkpoint["cudaRng"])
     args.output.mkdir(parents=True, exist_ok=True)
-    write_json(args.output / "config.json", config)
+    atomic_json(args.output / "config.json", config)
+    if args.resume:
+        if stale == 0:
+            # last.pt commits first; repair best.pt after an interrupted best/history write.
+            atomic_write(args.output / "best.pt", lambda stream: torch.save(checkpoint, stream))
+        else:
+            best_checkpoint = torch.load(args.output / "best.pt", map_location="cpu", weights_only=False)
+            validate_resume(best_checkpoint, config, class_slugs, dataset_binding, config_sha)
+            if (best_checkpoint["best"] != best or best_checkpoint["epoch"] > checkpoint["epoch"]
+                    or best_checkpoint["history"] != history[:best_checkpoint["epoch"] + 1]):
+                raise ValueError("Best checkpoint does not belong to this resume history.")
+            del best_checkpoint
+        atomic_json(args.output / "history.json", history)
+        if start >= config["epochs"] or stale >= config["patience"]:
+            print("Experiment already reached its epoch/early-stopping limit; no extra training performed.", flush=True)
+            return
     for epoch in range(start, config["epochs"]):
         model.train()
         total_loss = 0.0
@@ -84,6 +127,8 @@ def main():
             batch, targets = batch.to(device), targets.to(device)
             optimizer.zero_grad(set_to_none=True)
             loss = criterion(model(batch), targets)
+            if not torch.isfinite(loss).item():
+                raise ValueError("Non-finite training loss; refusing to publish a corrupt checkpoint.")
             loss.backward()
             optimizer.step()
             total_loss += loss.item() * len(targets)
@@ -91,7 +136,10 @@ def main():
         confusion = torch.zeros((10, 10), dtype=torch.int64)
         with torch.inference_mode():
             for batch, targets in valid_loader:
-                predictions = model(batch.to(device)).argmax(1).cpu()
+                logits = model(batch.to(device))
+                if not torch.isfinite(logits).all().item():
+                    raise ValueError("Non-finite validation logits.")
+                predictions = logits.argmax(1).cpu()
                 confusion += torch.bincount(targets * 10 + predictions, minlength=100).reshape(10, 10)
         matrix = confusion.numpy()
         denominator = matrix.sum(0) + matrix.sum(1)
@@ -102,16 +150,17 @@ def main():
         history.append({"epoch": epoch + 1, "trainLoss": total_loss / len(train), "validMacroF1": macro_f1, "confusion": matrix.tolist()})
         checkpoint = {
             "formatVersion": 1, "config": config, "classSlugs": class_slugs,
+            "datasetBinding": dataset_binding, "configFileSha256": config_sha,
             "state_dict": model.state_dict(), "optimizer": optimizer.state_dict(),
             "epoch": epoch, "best": best, "stale": stale, "history": history,
             "loaderRng": generator.get_state(), "torchRng": torch.get_rng_state(),
             "pythonRng": random.getstate(), "numpyRng": np.random.get_state(),
             "cudaRng": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
         }
-        torch.save(checkpoint, args.output / "last.pt")
+        atomic_write(args.output / "last.pt", lambda stream: torch.save(checkpoint, stream))
         if improved:
-            torch.save(checkpoint, args.output / "best.pt")
-        write_json(args.output / "history.json", history)
+            atomic_write(args.output / "best.pt", lambda stream: torch.save(checkpoint, stream))
+        atomic_json(args.output / "history.json", history)
         print(f"epoch={epoch + 1} valid_macro_f1={macro_f1:.4f}", flush=True)
         if stale >= config["patience"]:
             break
