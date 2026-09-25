@@ -1,62 +1,78 @@
-# Tanaman Rimpang
+﻿# Tanaman Rimpang
 
-Web pengenalan 10 jenis rimpang hasil panen dengan tampilan responsif untuk
-desktop, tablet, dan HP. Tersedia katalog, pencarian, detail tanaman,
-pratinjau kamera/foto lokal, dan demo hasil multiobjek.
+Web pengenal **10 jenis rimpang** langsung dari kamera. Arahkan kamera HP atau
+laptop ke rimpang, dan web akan menandai setiap rimpang serta menyebutkan
+jenisnya. Semua proses berjalan di perangkat, sehingga foto dan video tidak
+dikirim ke server.
 
-**Status:** sistem web dan toolkit training sudah tersedia. Model belum dilatih;
-demo hanya ilustrasi, bukan hasil identifikasi.
+Jenis yang dikenali: jahe, jahe merah, kencur, kunyit, kunyit putih, lempuyang,
+lengkuas, temu hitam, temu kunci, dan temulawak.
 
-## Arsitektur dan algoritma
+📄 **Hasil akurasi:** [docs/hasil-akurasi.pdf](docs/hasil-akurasi.pdf)
 
-| Bagian | Teknologi / fungsi |
-| --- | --- |
-| Web | Next.js App Router, TypeScript, Tailwind CSS |
-| Inferensi | ONNX Runtime Web di browser, WebGPU atau WASM |
-| Training server | Python, PyTorch, Ultralytics, timm |
+## Fitur
+
+- Pemindaian kamera realtime, maksimal 5 rimpang dalam satu layar
+- Pilih foto dari galeri sebagai alternatif kamera
+- Katalog dan detail setiap jenis rimpang
+- Tampilan responsif untuk HP, tablet, dan desktop
+
+## Cara kerja
 
 ```text
-Kamera / foto -> YOLO11n -> crop objek -> EfficientNetV2-B0 + CBAM -> hasil
+Kamera / foto → YOLO11n (cari rimpang) → potong tiap objek
+             → EfficientNetV2-B0 + CBAM (tentukan jenis) → hasil di layar
 ```
 
-- **YOLO11n:** menemukan posisi rimpang.
-- **EfficientNetV2-B0:** mengklasifikasikan 10 jenis rimpang.
-- **CBAM:** attention pada fitur sebelum klasifikasi.
+1. **Deteksi.** YOLO11n menemukan posisi setiap rimpang pada gambar.
+2. **Potong.** Setiap rimpang yang ditemukan dipotong menjadi gambar kecil.
+3. **Klasifikasi.** EfficientNetV2-B0 dengan attention CBAM menentukan jenis
+   rimpang pada setiap potongan.
+4. **Tampilkan.** Kotak, nama jenis, dan skor keyakinan muncul di layar. Jika
+   skornya rendah, objek ditandai "belum dikenali".
 
-Sistem disiapkan untuk maksimal 5 objek sekaligus. Foto/video tidak dikirim
-ke server; ketepatan dan kecepatan inferensi diukur setelah model dilatih.
+Kedua model berformat ONNX dan dijalankan di browser dengan ONNX Runtime Web
+(WebGPU, dengan cadangan otomatis ke CPU/WASM).
 
-## Menjalankan web
+## Teknologi
 
-Gunakan Node.js 22.18 atau lebih baru. Dari root proyek:
+| Bagian | Teknologi |
+| --- | --- |
+| Web | Next.js, TypeScript, Tailwind CSS |
+| Inferensi | ONNX Runtime Web (WebGPU / WASM) |
+| Model | YOLO11n + EfficientNetV2-B0 + CBAM (PyTorch, diekspor ke ONNX) |
+
+## Menjalankan
+
+Butuh **Node.js 22.18** atau lebih baru.
 
 ```powershell
-Set-Location web
+cd web
 npm ci
 npm run dev
 ```
 
-Buka **http://localhost:3000**. Produksi: `npm run build`, lalu `npm start`.
-Kamera membutuhkan **HTTPS atau localhost**.
+Buka **http://localhost:3000**, lalu pilih menu **Pindai**. Untuk mode
+produksi, jalankan `npm run build` lalu `npm start`.
 
-## Struktur proyek
+Kamera hanya bisa dipakai lewat **localhost atau HTTPS**.
+
+## Struktur
 
 ```text
-web/        Aplikasi Next.js dan inferensi browser
-shared/     Daftar kelas dan kontrak data/model
-training/   Persiapan dataset, training, dan ekspor ONNX
-data/       Sumber, anotasi, dan dataset
-artifacts/  Hasil training dan bundle model
-docs/       Panduan teknis
+web/       Aplikasi web dan model ONNX (web/public/models)
+shared/    Daftar kelas dan kontrak data
+training/  Kode pengolahan data dan pelatihan model
+docs/      Dokumentasi teknis dan laporan akurasi
 ```
 
-Training dijalankan terpisah di server. Alurnya: siapkan dataset dan anotasi ->
-split per kelompok -> training -> evaluasi -> ekspor ONNX -> pasang model ke web.
+## Catatan
 
-Panduan: [dataset](docs/dataset-guide.md) · [training server](docs/server-training.md) ·
-[integrasi model](docs/model-integration.md) · [arsitektur](docs/architecture.md).
+Model saat ini berstatus **eksperimental**. Label data dibuat otomatis tanpa
+pemeriksaan manual, jadi hasil pengenalan masih bisa keliru. Sebagian dataset
+berlisensi non-komersial (CC BY-NC-SA 4.0).
 
 ## Lisensi
 
-Kode proyek menggunakan [MIT License](LICENSE).
-Dependensi dan aset pihak ketiga tetap mengikuti lisensi masing-masing.
+Kode proyek menggunakan [MIT License](LICENSE). Dataset dan dependensi pihak
+ketiga mengikuti lisensi masing-masing.
