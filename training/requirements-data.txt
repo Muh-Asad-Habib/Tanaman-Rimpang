@@ -1,0 +1,5 @@
+# Standalone ingestion/audit environment (Python >=3.10); no training/CUDA stack.
+# Pillow/jsonschema constraints match training/requirements.txt.
+gdown==6.4.0
+Pillow>=11,<13
+jsonschema>=4.23,<5

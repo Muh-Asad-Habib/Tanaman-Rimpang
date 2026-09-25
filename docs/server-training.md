@@ -1,7 +1,122 @@
-# Menjalankan training nanti di server
+# Training di server terisolasi
 
-**Training tidak dijalankan pada tahap pembangunan web.** Skrip tersedia tetapi
-akurasi, kapasitas GPU dan ekspor trained model belum dibuktikan dengan dataset nyata.
+Training terpisah dari pembangunan dan startup web. Model tidak dinyatakan siap
+sebelum data ditinjau, training selesai, dan evaluasi/kalibrasi memenuhi kontrak.
+Redesign kamera dapat dikerjakan sambil menunggu tahap data/training.
+
+## Workspace dan pemindahan source
+
+Server proyek: `muhasadhabib@10.33.33.11`. Gunakan root Linux
+`/home/muhasadhabib/tanaman-rimpang`, terpisah dari proyek lain:
+
+```text
+code/<source-id>/        snapshot source dengan checksum
+envs/train-v1/           Python 3.11 untuk data/training
+envs/annotate-v1/        environment Label Studio yang terpisah
+cache/                  cache dependency dan pretrained weights
+data/<dataset-id>/       incoming, raw, images, annotations, manifests, prepared
+services/label-studio/   state dan kredensial privat, tidak ikut hasil training
+runs/<run-id>/           jobs/log, configs, detector, classifier, evaluation, web
+transfers/              arsip source dan hasil beserta checksum
+```
+
+Dari root proyek Windows, upload hanya source yang diperlukan:
+
+```powershell
+.\training\scripts\server_training.ps1 -Action Upload -SourceId rimpang-source-v1
+.\training\scripts\server_training.ps1 -Action Bootstrap -SourceId rimpang-source-v1
+```
+
+`Upload` mengecualikan web/node_modules, cache, IDE, dataset, `.git`, dan secrets.
+Snapshot existing tidak ditimpa. Arsip dipindahkan sebagai berkas, bukan lewat
+pipeline biner PowerShell. Host key harus sudah dipercaya; jangan mematikan
+pemeriksaan SSH untuk melewati kegagalan koneksi.
+
+`Bootstrap` memasang dependency data dan Label Studio pada environment terpisah.
+Tambahkan `-WithCuda` bila siap memasang stack training: pasangan
+torch 2.8.0/torchvision 0.23.0 dari kanal resmi cu128, kemudian requirements proyek.
+Pasangan ini memerlukan driver CUDA yang sesuai. Jangan memakai environment
+aplikasi lain atau melakukan instalasi dengan sudo. Simpan `pip freeze` tiap run.
+Instalasi dependency tidak menjalankan training atau mengunduh dataset otomatis.
+Jika koneksi kanal PyTorch bermasalah, pilih secara eksplisit
+`-TorchIndex https://pypi.org/simple`: distribusi Linux resmi PyTorch 2.8.0 pada
+PyPI juga memakai CUDA 12.8. Bootstrap tetap memeriksa runtime CUDA dan satu GPU;
+tidak ada fallback diam-diam ke wheel CPU atau versi model lain.
+
+## Job persisten dan sumber daya bersama
+
+`server_training.ps1 -Action Start` menjalankan modul `training.scripts.*` di
+tmux melalui supervisor. Pengguna telah mengizinkan job tetap berjalan setelah
+SSH atau sesi pengembangan ditutup. Contoh pemeriksaan CLI ringan:
+
+```powershell
+.\training\scripts\server_training.ps1 -Action Start -SourceId rimpang-source-v1 `
+  -RunId preflight-v1 -JobId cli-help `
+  -PythonModule training.scripts.prepare_dataset -Arguments @("--help")
+.\training\scripts\server_training.ps1 -Action Status -SourceId rimpang-source-v1 `
+  -RunId preflight-v1 -JobId cli-help
+.\training\scripts\server_training.ps1 -Action Logs -SourceId rimpang-source-v1 `
+  -RunId preflight-v1 -JobId cli-help
+```
+
+Periksa `status.json`, bukan hanya keberadaan sesi tmux. Sukses memiliki exit
+code 0; kegagalan/putusnya supervisor tidak disamarkan. `-ResumeJob` hanya
+mengizinkan ulang supervisor failed/interrupted; argumen resume checkpoint
+model tetap harus diberikan dengan benar. Job completed memakai JobId baru.
+Status `orphaned` berarti child job masih hidup tanpa supervisor. Jangan
+menjalankan salinan kedua; periksa PID spesifik yang tercatat terlebih dahulu.
+
+Supervisor membatasi affinity maksimal 8 CPU dan thread numerik 4. Config model
+tetap memakai 4 data-loader workers. Jalankan detector dan classifier bergiliran
+pada GPU fisik 0 yang telah dialokasikan; gunakan `-Gpu 0` atau UUID GPU 0 yang
+telah diperiksa. Default tanpa `-Gpu` menyembunyikan seluruh GPU, sesuai job data
+dan anotasi. Jangan memakai GPU 1 atau menghentikan proses pengguna lain.
+Periksa ulang VRAM/disk sebelum training; nilai kosong saat inspeksi bukan
+reservasi. Slurm yang belum siap bukan alasan mengubah konfigurasi global.
+
+## Anotasi privat melalui SSH
+
+Setelah gambar sumber dipulihkan dan turunan EXIF-normalized siap, jalankan
+`training.scripts.annotation_service` dari environment anotasi. Contoh perintah
+Linux di server, dari snapshot source:
+
+```bash
+BASE=/home/muhasadhabib/tanaman-rimpang
+DATA="$BASE/data/drive-v1"
+"$BASE/envs/annotate-v1/bin/python" -m training.scripts.annotation_service \
+  --service "$BASE/services/label-studio" --port 8087 \
+  start --base "$BASE" --images "$DATA/images"
+```
+
+Gunakan `Start` wrapper dengan `-Environment annotate` dan RunId layanan yang
+terpisah jika ingin supervisor/tmux persisten. Jangan menaruh job layanan yang
+selalu hidup dalam RunId training yang nantinya akan dipaketkan.
+
+Layanan bind hanya `127.0.0.1:8087`; pemilik SSH mendapat akun privat yang dibuat
+secara acak, disimpan pada `services/label-studio/credentials.json` mode 600.
+Ambil kredensial secara privat menggunakan akun SSH sendiri; jangan mengirimkannya
+ke repo, screenshot, laporan, atau log. Analytics dimatikan dan local-file root
+hanya menunjuk ke `DATA/images`, bukan home server atau seluruh filesystem.
+
+Buka tunnel dari komputer lokal:
+
+```powershell
+.\training\scripts\server_training.ps1 -Action Tunnel -Port 8087
+```
+
+Lalu buka `http://localhost:8087`. Tunnel adalah koneksi lokal foreground;
+tutup dengan Ctrl+C ketika tidak diperlukan. Menutup tunnel tidak menghentikan
+layanan anotasi atau training di server.
+
+Subcommand `annotation_service import` menerima `--tasks`, `--label-config`,
+dan `--project-state` hasil persiapan anotasi. Ia membuat project dan memastikan
+inventaris task cocok; pengulangan melanjutkan task yang belum diimpor.
+Subcommand `export` mengambil seluruh task, termasuk yang belum selesai.
+Ekspor Label Studio **belum** berarti anotasi valid: importer review tetap harus
+menolak draft/skipped/konflik, bbox invalid, group belum jelas, dan negatif yang
+tidak ditandai eksplisit.
+
+## Persiapan data dan training
 
 1. Salin source proyek, `shared`, `training`, dan metadata sumber ke server.
 2. Buat virtualenv Python3.11/3.12 yang didukung dependency. Pasang pasangan
@@ -76,3 +191,25 @@ python -m training.scripts.export_models --detector artifacts/detector-v1/weight
 Default export FP32, batch1, ONNX opset17. Torch/ORT CPU numeric smoke bukan
 evaluasi akurasi maupun pengganti paritas gambar/browser. Sesudah ekspor lakukan
 golden-image checks pada browser dan perangkat HP/laptop sebenarnya.
+
+## Mengembalikan hasil ke komputer lokal
+
+Paketkan hanya run yang job-nya sudah berhenti. Source dataset dan kredensial
+Label Studio tidak termasuk artefak training.
+
+```powershell
+.\training\scripts\server_training.ps1 -Action Collect `
+  -SourceId rimpang-source-v1 -RunId rimpang-v1
+```
+
+Hasil dipindahkan ke `artifacts\rimpang-v1` melalui staging, diperiksa checksum
+arsip serta seluruh berkas, kemudian diterbitkan sebagai direktori baru.
+Direktori hasil yang sudah ada tidak ditimpa. Arsip remote identik dapat dipakai
+ulang setelah transfer gagal, sedangkan checkpoint/dataset server tidak dihapus.
+Gunakan `-Destination` untuk direktori lokal baru bila mengambil snapshot lain.
+
+`-AllowIncomplete` khusus mengambil diagnosis/log/hasil parsial dan mencatat
+`status: incomplete` serta daftar artefak yang belum ada. Opsi tersebut bukan
+persetujuan memasang model dan tidak mengubah manifest web.
+Setelah bundle layak, ikuti `model-integration.md`; jangan menyalin checkpoint
+PyTorch langsung ke direktori model browser.

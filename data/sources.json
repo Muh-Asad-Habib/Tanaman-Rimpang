@@ -4,10 +4,29 @@
     "id": "rimpang-original-drive",
     "url": "https://drive.google.com/drive/folders/1VEkTUavfY_q47g3jy7hSXwbmTG69_TeX",
     "reference": "README proyek SKRIPSI_ALYA, dikonfirmasi pengguna",
-    "status": "not-restored",
+    "status": "inventory-verified-not-restored",
     "license": "requires-owner-review",
     "annotationStatus": "not-verified",
-    "note": "Jangan memakai salinan lokal rusak sebagai dataset. Pulihkan dan audit sumber asli di server."
+    "note": "Inventaris metadata Drive cocok dengan 5507 tujuan unik rename_mapping.txt. Isi gambar, lisensi per sumber, bbox, dan kelompok tetap harus diaudit. Jangan memakai salinan lokal rusak sebagai dataset.",
+    "intendedUse": "noncommercial-research",
+    "expectedInventory": {
+      "images": 5507,
+      "metadataFiles": ["ATRIBUSI.txt", "rename_mapping.txt"],
+      "imagesPerClass": {
+        "jahe": 741,
+        "jahe-merah": 230,
+        "kencur": 741,
+        "kunyit": 741,
+        "kunyit-putih": 347,
+        "lempuyang": 541,
+        "lengkuas": 741,
+        "temu-hitam": 237,
+        "temu-kunci": 541,
+        "temulawak": 647
+      },
+      "contentIntegrity": "not-yet-audited",
+      "note": "Jumlah metadata bukan bukti data siap training. Folder publik biasa dapat hanya menampilkan 50 entri awal."
+    }
   }],
   "previousLocalAudit": {
     "preprocessedFileNames": 5507,
