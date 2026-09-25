@@ -15,6 +15,7 @@ export interface ReadyManifest {
   labelsVersion: 1;
   status: "ready";
   version: string;
+  experimentalNote?: string;
   classSlugs: string[];
   maxObjects: 5;
   detector: Artifact & {

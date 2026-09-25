@@ -23,7 +23,9 @@ export function ModelAvailability() {
       setAvailability({
         status: manifest.status,
         message: manifest.status === "ready"
-          ? "Bundle tersedia. Buka ruang pindai untuk memuat model dan memeriksa dukungan perangkat."
+          ? manifest.experimentalNote
+            ? `Model ${manifest.version} siap. ${manifest.experimentalNote}`
+            : "Bundle tersedia. Buka ruang pindai untuk memuat model dan memeriksa dukungan perangkat."
           : manifest.reason,
       });
     }).catch((error: unknown) => {

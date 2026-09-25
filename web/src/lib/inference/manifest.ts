@@ -51,6 +51,8 @@ export function parseManifest(value: unknown): Manifest {
   return {
     schemaVersion: 1, labelsVersion: 1, status: "ready",
     version: value.version, classSlugs: expected, maxObjects: 5,
+    ...(value.experimental === true && typeof value.reason === "string" && value.reason.trim()
+      ? { experimentalNote: value.reason } : {}),
     detector: { ...detector, outputLayout: "1x5xN", padValue: 114,
       scoreThreshold: detector.scoreThreshold, iouThreshold: detector.iouThreshold },
     classifier: { ...classifier, mean: classifier.mean, std: classifier.std,
