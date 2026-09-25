@@ -74,6 +74,25 @@ dan anotasi. Jangan memakai GPU 1 atau menghentikan proses pengguna lain.
 Periksa ulang VRAM/disk sebelum training; nilai kosong saat inspeksi bukan
 reservasi. Slurm yang belum siap bukan alasan mengubah konfigurasi global.
 
+## Pemulihan dataset Drive
+
+Dataset aktif: `data/drive-v2` (5.507 gambar + `ATRIBUSI.txt` + `rename_mapping.txt`).
+
+```powershell
+.\training\scripts\server_training.ps1 -Action Start -SourceId rimpang-source-v2 `
+  -RunId dataset-drive-v2 -JobId download -PythonModule training.scripts.download_dataset `
+  -Arguments @("--dataset-root", "/home/muhasadhabib/tanaman-rimpang/data/drive-v2")
+.\training\scripts\server_training.ps1 -Action Start -SourceId rimpang-source-v2 `
+  -RunId dataset-drive-v2 -JobId audit -PythonModule training.scripts.audit_raw_dataset `
+  -Arguments @("--dataset-root", "/home/muhasadhabib/tanaman-rimpang/data/drive-v2", "--near-duplicates")
+```
+
+gdown hanya dipakai untuk listing folder. Unduhan per-berkas via `uc?id=` ditolak
+Google ("many accesses") setelah puluhan request anonim, sehingga berkas diambil
+dari `drive.usercontent.google.com` dengan jeda 0,5 detik dan backoff (±2,5 jam).
+Audit single-core menormalkan EXIF ke PNG lossless (±2 jam). Keduanya dapat
+dilanjutkan dengan perintah yang sama bila terputus.
+
 ## Anotasi privat melalui SSH
 
 Setelah gambar sumber dipulihkan dan turunan EXIF-normalized siap, jalankan
@@ -82,7 +101,7 @@ Linux di server, dari snapshot source:
 
 ```bash
 BASE=/home/muhasadhabib/tanaman-rimpang
-DATA="$BASE/data/drive-v1"
+DATA="$BASE/data/drive-v2"
 "$BASE/envs/annotate-v1/bin/python" -m training.scripts.annotation_service \
   --service "$BASE/services/label-studio" --port 8087 \
   start --base "$BASE" --images "$DATA/images"
