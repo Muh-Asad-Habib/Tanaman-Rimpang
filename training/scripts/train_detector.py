@@ -38,6 +38,27 @@ def checkpoint_receipt(output, *, snapshot):
                 file.unlink(missing_ok=True)
 
 
+def restore_class_names(output):
+    # Ultralytics single_cls=True renames the only class to "item"; the shared contract requires "rimpang".
+    import torch
+    for name in ("last", "best"):
+        path = Path(output) / "weights" / f"{name}.pt"
+        if not path.is_file():
+            continue
+        checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+        for key in ("model", "ema"):
+            if checkpoint.get(key) is not None:
+                checkpoint[key].names = {0: "rimpang"}
+        temporary = path.with_suffix(".tmp")
+        torch.save(checkpoint, temporary)
+        os.replace(temporary, path)
+
+
+def finish_training(output):
+    restore_class_names(output)
+    checkpoint_receipt(output, snapshot=False)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Train generic YOLO11n on the server; never run as part of the web startup.")
     parser.add_argument("--data", required=True, type=Path)
@@ -81,7 +102,7 @@ def main():
     model.add_callback("on_pretrain_routine_start", initialize_run)
     model.add_callback("on_model_save", lambda trainer: checkpoint_receipt(args.output, snapshot=True))
     # Ultralytics strips optimizer state in final_eval; keep the earlier atomic resume snapshots.
-    model.add_callback("on_train_end", lambda trainer: checkpoint_receipt(args.output, snapshot=False))
+    model.add_callback("on_train_end", lambda trainer: finish_training(args.output))
     if args.resume:
         if model.ckpt.get("optimizer") is None or model.ckpt.get("epoch", -1) < 0:
             parser.error("Checkpoint was finalized without optimizer state; use the receipt's atomic resumeLast snapshot if needed.")

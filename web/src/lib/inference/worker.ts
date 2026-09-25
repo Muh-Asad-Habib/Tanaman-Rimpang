@@ -23,6 +23,41 @@ async function loadArtifact(baseUrl: string, asset: Artifact): Promise<ArrayBuff
   return data;
 }
 
+function probeInput(size: number, low: number, high: number): Float32Array {
+  const data = new Float32Array(3 * size * size);
+  for (let i = 0; i < data.length; i++) data[i] = low + (high - low) * (0.5 + 0.5 * Math.sin(i * 0.013) * Math.cos(i * 0.0007));
+  return data;
+}
+
+async function probe(target: ort.InferenceSession, asset: Artifact, data: Float32Array): Promise<Float32Array> {
+  const tensor = new ort.Tensor("float32", data, [1, 3, asset.inputSize, asset.inputSize]);
+  try {
+    const outputs = await target.run({ [asset.inputName]: tensor });
+    try {
+      const output = outputs[asset.outputName];
+      if (!output || !(output.data instanceof Float32Array)) throw new Error("Tensor keluaran tidak cocok dengan manifest.");
+      return output.data.slice();
+    } finally { Object.values(outputs).forEach((value) => value.dispose()); }
+  } finally { tensor.dispose(); }
+}
+
+// Some WebGPU drivers/software adapters silently return wrong values; compare against WASM before trusting them.
+async function webgpuMatchesWasm(bytes: ArrayBuffer, asset: Artifact, gpuSession: ort.InferenceSession, low: number, high: number): Promise<boolean> {
+  const reference = await ort.InferenceSession.create(bytes, { executionProviders: ["wasm"] });
+  try {
+    const data = probeInput(asset.inputSize, low, high);
+    const [gpu, cpu] = [await probe(gpuSession, asset, data), await probe(reference, asset, data)];
+    if (gpu.length !== cpu.length) return false;
+    let scale = 1;
+    let error = 0;
+    for (let i = 0; i < cpu.length; i++) {
+      scale = Math.max(scale, Math.abs(cpu[i]));
+      error = Math.max(error, Math.abs(gpu[i] - cpu[i]));
+    }
+    return Number.isFinite(error) && error <= 0.02 * scale;
+  } finally { await reference.release(); }
+}
+
 async function initialize(config: ReadyManifest, baseUrl: string): Promise<void> {
   manifest = config;
   ort.env.wasm.wasmPaths = new URL("/vendor/ort/", baseUrl).href;
@@ -45,8 +80,16 @@ async function initialize(config: ReadyManifest, baseUrl: string): Promise<void>
   if ("gpu" in navigator) {
     try {
       await createSessions("webgpu");
+      if (!await webgpuMatchesWasm(detectorBytes, config.detector, detector!, 0, 1)
+          || !await webgpuMatchesWasm(classifierBytes, config.classifier, classifier!, -1, 1)) {
+        throw new Error("Hasil WebGPU berbeda dari CPU pada uji kecocokan.");
+      }
       provider = "webgpu";
     } catch (error) {
+      await detector?.release();
+      await classifier?.release();
+      detector = null;
+      classifier = null;
       note = `WebGPU tidak tersedia untuk model ini. Menggunakan CPU/WASM; kecepatan dapat berkurang. ${error instanceof Error ? error.message : "Inisialisasi GPU gagal."}`;
       await createSessions("wasm");
     }

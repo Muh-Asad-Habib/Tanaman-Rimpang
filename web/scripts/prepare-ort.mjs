@@ -9,7 +9,7 @@ const destination = path.join(root, "public", "vendor", "ort");
 await mkdir(destination, { recursive: true });
 for (const name of [
   "ort-wasm-simd-threaded.wasm", "ort-wasm-simd-threaded.mjs",
-  "ort-wasm-simd-threaded.jsep.wasm", "ort-wasm-simd-threaded.jsep.mjs",
+  "ort-wasm-simd-threaded.asyncify.wasm", "ort-wasm-simd-threaded.asyncify.mjs",
 ]) {
   await copyFile(require.resolve(`onnxruntime-web/${name}`), path.join(destination, name));
 }

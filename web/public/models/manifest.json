@@ -1,6 +1,54 @@
 {
   "schemaVersion": 1,
   "labelsVersion": 1,
-  "status": "unavailable",
-  "reason": "Model identifikasi belum dilatih. Kamera dan foto dapat digunakan sebagai pratinjau."
+  "status": "ready",
+  "version": "auto-v1-experimental",
+  "maxObjects": 5,
+  "classSlugs": [
+    "jahe",
+    "jahe-merah",
+    "kencur",
+    "kunyit",
+    "kunyit-putih",
+    "lempuyang",
+    "lengkuas",
+    "temu-hitam",
+    "temu-kunci",
+    "temulawak"
+  ],
+  "detector": {
+    "file": "detector-e3c18f2b6b749420df09d7f63bf1ebcf0e1957960d3a7183c4887e8d769cf63f.onnx",
+    "sha256": "e3c18f2b6b749420df09d7f63bf1ebcf0e1957960d3a7183c4887e8d769cf63f",
+    "inputName": "images",
+    "outputName": "output0",
+    "inputSize": 416,
+    "dtype": "float32",
+    "outputLayout": "1x5xN",
+    "padValue": 114,
+    "scoreThreshold": 0.5,
+    "iouThreshold": 0.45
+  },
+  "classifier": {
+    "file": "classifier-92dad81a4524f1d4d8d4c5b6f2ec29c92280abcd5820477a467c97859461b4b5.onnx",
+    "sha256": "92dad81a4524f1d4d8d4c5b6f2ec29c92280abcd5820477a467c97859461b4b5",
+    "inputName": "images",
+    "outputName": "logits",
+    "inputSize": 224,
+    "dtype": "float32",
+    "mean": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "std": [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "cropMargin": 0.1,
+    "scoreThreshold": 0.65,
+    "minMargin": 0.0
+  },
+  "experimental": true,
+  "reason": "Eksperimental: kotak dibuat otomatis dan kelas diambil dari nama folder tanpa review manusia. Hasil bisa keliru."
 }

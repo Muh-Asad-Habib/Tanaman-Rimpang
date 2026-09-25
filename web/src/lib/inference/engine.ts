@@ -51,8 +51,9 @@ export class InferenceEngine {
         const message = event.data;
         if (message.type === "ready") {
           this.clearTimeout();
+          const base = message.note ?? `Model siap, diproses lokal melalui ${message.provider.toUpperCase()}.`;
           this.report({ status: "ready", provider: message.provider,
-            message: message.note ?? `Model siap, diproses lokal melalui ${message.provider.toUpperCase()}.` });
+            message: manifest.experimentalNote ? `${base} ${manifest.experimentalNote}` : base });
         } else if (message.type === "result") {
           if (this.gate.finish(message.result.sessionId, message.result.frameId)) {
             this.clearTimeout();

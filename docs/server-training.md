@@ -232,3 +232,58 @@ Gunakan `-Destination` untuk direktori lokal baru bila mengambil snapshot lain.
 persetujuan memasang model dan tidak mengubah manifest web.
 Setelah bundle layak, ikuti `model-integration.md`; jangan menyalin checkpoint
 PyTorch langsung ke direktori model browser.
+
+## Run otomatis `rimpang-auto-v1` (eksperimental, tanpa review manusia)
+
+Run ini dibuat sepenuhnya otomatis atas permintaan pemilik proyek. Kotak objek
+berasal dari OWLv2 zero-shot (`training/scripts/auto_annotate.py`) dan kelas
+dari nama folder Drive. Tidak ada frame negatif, jadi false accept belum
+terukur, dan bundle hanya dapat diekspor dengan `--experimental`.
+
+Alur yang dijalankan (semua di GPU0, source `rimpang-source-v3`):
+
+1. `data/drive-v2` → audit (5.507 gambar valid) → `auto_annotate` →
+   `data/drive-v2/annotations/auto-v1` (5.379 gambar beranotasi, 4.028 grup).
+2. `prepare_dataset` → `data/prepared/auto-v1`.
+3. `train_classifier` → `runs/rimpang-auto-v1/classifier/best.pt`;
+   `train_detector` → `runs/rimpang-auto-v1/detector/weights/best.pt`.
+4. Ultralytics `single_cls` menamai kelas `item`. Salinan dengan nama kelas
+   `rimpang` (bobot identik, lihat `DERIVED.json`) ada di
+   `runs/rimpang-auto-v1/detector-renamed/best.pt`, sehingga receipt detector
+   asli tetap utuh. `train_detector.py` kini memperbaiki nama ini sendiri.
+5. `evaluate_models` → `runs/rimpang-auto-v1/evaluation` (exit 2 karena gate
+   negatif belum terpenuhi) → `export_models --experimental` →
+   `runs/rimpang-auto-v1/web-bundle` (versi `auto-v1-experimental`).
+
+Hasil (split test beku, ambang dipilih di valid):
+
+| Metrik | Nilai |
+| --- | --- |
+| Detector mAP50 / mAP50-95 (test) | 0,866 / 0,780 |
+| End-to-end macro-F1 (valid / test) | 0,831 / 0,823 |
+| Precision prediksi diterima (test) | 0,888 |
+| Uji browser, 30 foto test (3 per kelas) | 28/30 benar (93,3%) |
+
+F1 per kelas di test: lengkuas 0,965, jahe-merah 0,931, jahe 0,930,
+temu-hitam 0,899, lempuyang 0,842, kunyit 0,826, temulawak 0,802,
+temu-kunci 0,768, kunyit-putih 0,704, kencur 0,567. Metrik ini optimistis
+karena label test juga otomatis. Pada uji browser, satu foto kunyit putih
+salah dikenali sebagai temu hitam dan satu tidak dikenali.
+
+Struktur server setelah run:
+
+```text
+~/tanaman-rimpang/
+  code/rimpang-source-v3/      source yang dipakai job
+  data/drive-v2/               raw, images, manifests, annotations/auto-v1
+  data/prepared/auto-v1/       dataset beku (detector/, classifier/)
+  runs/rimpang-auto-v1/
+    classifier/  detector/  detector-renamed/
+    evaluation/  web-bundle/  web-test-images{,-small}/
+    jobs/<job>/{status.json,stdout.log}
+```
+
+Bundle dipasang lokal dengan
+`python -m training.scripts.install_web_bundle --bundle artifacts\rimpang-auto-v1\web-bundle`.
+Di browser, sesi WebGPU dibandingkan dengan WASM memakai input uji saat model
+dimuat. Jika hasilnya berbeda, web otomatis kembali ke WASM.
