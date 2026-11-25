@@ -13,9 +13,7 @@ interface Track {
 
 export class ObjectTracker {
   private tracks: Track[] = [];
-  private nextId = 1;
-
-  reset(): void { this.tracks = []; this.nextId = 1; }
+  reset(): void { this.tracks = []; }
 
   update(detections: Detection[], timestamp: number, maxObjects: number): Track[] {
     const prior = this.tracks.filter((track) => timestamp - track.seenAt <= 1000);
@@ -25,7 +23,7 @@ export class ObjectTracker {
       const continuityB = prior.some((p) => intersectionOverUnion(p.detection.box, b.box) > 0.4) ? 1 : 0;
       return continuityB - continuityA || b.score - a.score;
     }).slice(0, maxObjects);
-    this.tracks = ranked.map((detection) => {
+    const matched = ranked.map((detection) => {
       const candidates = prior.filter((p) => !used.has(p.id))
         .map((track) => ({ track, iou: intersectionOverUnion(track.detection.box, detection.box) }))
         .filter((item) => item.iou >= 0.4).sort((a, b) => b.iou - a.iou);
@@ -38,8 +36,13 @@ export class ObjectTracker {
         used.add(best.track.id);
         return { ...best.track, detection, seenAt: timestamp };
       }
-      return { id: this.nextId++, detection, seenAt: timestamp, scores: null, candidate: null, confirmations: 0 };
+      return detection;
     });
+    // Reuse the smallest free number so labels stay 1..N instead of growing forever.
+    const taken = new Set(prior.map((track) => track.id));
+    const freeId = () => { let id = 1; while (taken.has(id)) id++; taken.add(id); return id; };
+    this.tracks = matched.map((item) => "id" in item ? item
+      : { id: freeId(), detection: item, seenAt: timestamp, scores: null, candidate: null, confirmations: 0 });
     return this.tracks;
   }
 

@@ -138,6 +138,17 @@ test("per-object labels never share smoothing and reset on disappearance", () =>
   tracker.update([], 500, 5);
   const fresh = tracker.update(detections, 750, 5);
   assert.equal(tracker.classify(fresh[0].id, scores(0), 0.7, 0.1).status, "analyzing");
+  assert.deepEqual(fresh.map((track) => track.id).sort(), [1, 2]);
+});
+test("track numbers reuse the smallest free id instead of growing", () => {
+  const tracker = new ObjectTracker();
+  const at = (x: number) => ({ box: { x, y: 0.1, width: 0.2, height: 0.2 }, score: 0.9 });
+  for (let frame = 0; frame < 20; frame++) {
+    tracker.update([at(0.1)], frame * 2000, 5);
+  }
+  assert.deepEqual(tracker.update([at(0.1)], 50000, 5).map((track) => track.id), [1]);
+  const pair = tracker.update([at(0.1), at(0.6)], 50250, 5);
+  assert.deepEqual(pair.map((track) => track.id).sort(), [1, 2]);
 });
 test("softmax is finite for large logits and rejects wrong output", () => {
   const result = softmax(new Float32Array([1000, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
