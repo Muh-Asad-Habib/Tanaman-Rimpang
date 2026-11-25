@@ -44,26 +44,112 @@ putih, lempuyang, lengkuas, temu hitam, temu kunci, dan temulawak.
 
 ## Cara kerja
 
-```text
-Kamera / foto -> YOLO11n -> potong tiap rimpang -> EfficientNetV2-B0 + CBAM -> hasil
+```mermaid
+flowchart LR
+  A[Kamera / foto] --> B[YOLO11n<br/>cari letak rimpang]
+  B --> C[Potong tiap rimpang<br/>maks. 5]
+  C --> D[EfficientNetV2-B0 + CBAM<br/>tentukan jenis]
+  D --> E[Stabilkan antar-frame]
+  E --> F[Kotak + nama + skor]
 ```
 
-Pengenalan dilakukan dalam dua tahap:
+Singkatnya, aplikasi bekerja seperti dua orang yang berbagi tugas:
 
-1. **YOLO11n** mencari letak setiap rimpang pada gambar.
-2. Tiap rimpang yang ditemukan dipotong, lalu **EfficientNetV2-B0** dengan
-   modul attention **CBAM** menentukan jenisnya.
+1. **Mencari** – YOLO11n melihat gambar (diperkecil ke 416×416) dan menandai
+   setiap benda yang berupa rimpang dengan kotak. Model ini belum peduli
+   jenisnya, hanya "ini rimpang atau bukan".
+2. **Memotong** – tiap kotak dipotong dengan sedikit ruang tambahan (10%) lalu
+   diubah ke 224×224. Maksimal 5 rimpang diproses per frame.
+3. **Mengenali** – EfficientNetV2-B0 dengan modul attention CBAM menilai tiap
+   potongan dan memberi skor untuk 10 jenis rimpang. CBAM membantu model
+   memberi bobot lebih pada saluran warna dan area gambar yang paling
+   membedakan.
+4. **Menstabilkan** – saat memakai kamera, setiap rimpang diikuti dari frame ke
+   frame. Skor dihaluskan agar label tidak berkedip, dan jenis baru ditampilkan
+   setelah hasilnya sama di dua frame berturut-turut.
+5. **Menampilkan** – kalau skor tertinggi di bawah 65%, rimpang ditandai
+   "belum dikenali" alih-alih menebak.
 
-Hasilnya berupa kotak, nama jenis, dan skor keyakinan. Kalau skornya terlalu
-rendah, rimpang ditandai "belum dikenali". Kedua model disimpan dalam format
-ONNX dan dijalankan dengan ONNX Runtime Web. Aplikasi memakai WebGPU bila
-tersedia, dan otomatis beralih ke CPU (WASM) bila tidak.
+Semua langkah berjalan di browser memakai ONNX Runtime Web: WebGPU bila
+tersedia, dan otomatis beralih ke CPU (WASM) bila tidak. Gambar tidak pernah
+dikirim ke server.
+
+## Model
+
+| Tahap | Model | Input | Ukuran file | Ambang |
+| --- | --- | --- | --- | --- |
+| Deteksi | YOLO11n (1 kelas: rimpang) | 416×416 | ~10 MB | skor ≥ 0,50, IoU NMS 0,45 |
+| Klasifikasi | EfficientNetV2-B0 + CBAM (10 kelas) | 224×224 | ~24 MB | skor ≥ 0,65 |
+
+Kedua model dilatih dengan PyTorch lalu diekspor ke ONNX. Dataset berisi
+5.379 foto yang dibagi per kelompok foto agar foto yang mirip tidak bocor
+antar-bagian: 3.760 latih, 795 validasi, dan 824 uji. Ambang dipilih memakai
+data validasi, lalu data uji dipakai sekali untuk laporan di bawah.
+
+## Hasil akurasi model
+
+Diukur pada data uji (824 foto, 1.044 rimpang) memakai ambang yang sama
+dengan aplikasi, kecuali mAP yang memakai cara hitung standar Ultralytics.
+
+**Deteksi (YOLO11n)**
+
+| Metrik | Nilai |
+| --- | --- |
+| mAP@50 | 86,6% |
+| mAP@50–95 | 78,0% |
+| Precision (ambang aplikasi) | 89,2% |
+| Recall (ambang aplikasi) | 75,9% |
+
+**Klasifikasi jenis (EfficientNetV2-B0 + CBAM)**
+
+| Metrik | Nilai |
+| --- | --- |
+| Akurasi pada potongan rimpang yang terdeteksi | 98,2% |
+| Macro F1 pada potongan yang terdeteksi | 98,4% |
+| Akurasi pada potongan kotak asli (ground truth) | 94,5% |
+| Macro F1 pada potongan kotak asli | 95,0% |
+
+**Keseluruhan (deteksi + klasifikasi)**
+
+| Metrik | Nilai |
+| --- | --- |
+| Precision hasil yang ditampilkan | 88,8% |
+| Rimpang yang ditemukan dan dikenali benar | 74,2% |
+| Macro F1 | 82,3% |
+
+<details>
+<summary>F1 per jenis (potongan kotak asli, dengan ambang aplikasi)</summary>
+
+| Jenis | F1 |
+| --- | --- |
+| Lengkuas | 99,6% |
+| Jahe merah | 99,0% |
+| Lempuyang | 98,9% |
+| Temu kunci | 97,8% |
+| Jahe | 95,0% |
+| Kunyit | 94,4% |
+| Temulawak | 93,9% |
+| Temu hitam | 92,6% |
+| Kunyit putih | 91,9% |
+| Kencur | 88,3% |
+
+</details>
+
+Artinya, kalau sebuah rimpang sudah terdeteksi, jenisnya hampir selalu
+benar. Titik lemahnya ada di tahap deteksi: sekitar seperempat rimpang
+terlewat, terutama pada foto yang berisi banyak rimpang berdempetan (pada foto
+berisi 5 rimpang, hanya ~23% yang terdeteksi). Untuk hasil terbaik, pindai
+satu sampai beberapa rimpang yang tidak saling menumpuk.
+
+> Model ini masih **eksperimental**: kotak pada dataset dibuat otomatis dan
+> label diambil dari nama folder tanpa pemeriksaan manual, serta belum diuji
+> terhadap foto yang bukan rimpang.
 
 ## Hasil uji kamera
 
-Aplikasi diuji lewat kamera tiruan (Playwright) yang memutar 30 foto uji,
-3 per jenis, dengan beberapa gangguan. Angka di bawah adalah tebakan pertama
-yang benar.
+Selain evaluasi model di atas, aplikasi juga diuji lewat kamera tiruan
+(Playwright) yang memutar 30 foto uji, 3 per jenis, dengan beberapa gangguan.
+Angka di bawah adalah tebakan pertama yang benar.
 
 | Kondisi | Benar |
 | --- | --- |
