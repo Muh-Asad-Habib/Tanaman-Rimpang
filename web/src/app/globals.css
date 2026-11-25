@@ -15,6 +15,7 @@
   --warning-bg: #faf4e5;
   --error: #8a382e;
   --radius: 18px;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -88,6 +89,11 @@ p, h1, h2, h3 {
 h1, h2, h3 {
   font-weight: 650;
   line-height: 1.2;
+  text-wrap: balance;
+}
+
+input[type=search]::-webkit-search-cancel-button {
+  cursor: pointer;
 }
 
 h1, h2 {
@@ -133,7 +139,7 @@ select:focus-visible, summary:focus-visible {
 }
 
 .eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: .13em;
   line-height: 1.6;
@@ -384,7 +390,7 @@ select:focus-visible, summary:focus-visible {
   justify-items: center;
   gap: 12px;
   color: #d7e2d4;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .home-specimen img {
@@ -470,6 +476,8 @@ select:focus-visible, summary:focus-visible {
 .footer-inner a {
   display: flex;
   align-items: center;
+  justify-content: center;
+  min-width: 44px;
   min-height: 44px;
 }
 
@@ -592,7 +600,7 @@ select:focus-visible, summary:focus-visible {
   left: 17px;
   z-index: 2;
   color: #525d4d;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: .1em;
 }
 
@@ -646,7 +654,8 @@ select:focus-visible, summary:focus-visible {
 
 .plant-card-heading > span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
+  text-align: right;
 }
 
 .scientific {
@@ -1182,7 +1191,8 @@ details[open] > summary > span {
   padding: 3px 8px;
   border-radius: 999px;
   background: var(--sage);
-  font-size: 11px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -1238,7 +1248,8 @@ details[open] > summary > span {
 .result-item p {
   margin-top: 4px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .result-item a {
@@ -1374,7 +1385,7 @@ details[open] > summary > span {
   border-radius: 5px;
   background: #f5f6f1f2;
   color: #475740;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 @media (max-width: 1100px) {
@@ -1571,8 +1582,8 @@ details[open] > summary > span {
 
   .home-hero .eyebrow {
     margin-bottom: 18px;
-    font-size: 10px;
-    letter-spacing: .08em;
+    font-size: 12px;
+    letter-spacing: .06em;
   }
 
   .home-hero h1 {
@@ -1594,7 +1605,7 @@ details[open] > summary > span {
 
   .home-privacy {
     margin-top: 18px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .home-support {
@@ -1612,7 +1623,7 @@ details[open] > summary > span {
   .footer-inner {
     padding-block: 14px;
     gap: 3px 16px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .footer-inner nav {
@@ -1674,7 +1685,8 @@ details[open] > summary > span {
   .specimen-number {
     top: 12px;
     left: 12px;
-    font-size: 9px;
+    font-size: 11px;
+    letter-spacing: .06em;
   }
 
   .filter {
@@ -1763,7 +1775,7 @@ details[open] > summary > span {
   }
 
   .workspace-limit {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .camera-select {
@@ -1822,7 +1834,7 @@ details[open] > summary > span {
   }
 
   .scanner-small-note {
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .scanner-sidebar {
@@ -1839,19 +1851,19 @@ details[open] > summary > span {
 
   .demo-banner {
     padding: 9px 12px;
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .object-box span {
     padding: 2px 4px;
-    font-size: 10px;
+    font-size: 11px;
   }
 
   .demo-scene-note {
     bottom: 8px;
     left: 10px;
     max-width: calc(100% - 20px);
-    font-size: 10px;
+    font-size: 11px;
   }
 }
 
@@ -1862,10 +1874,6 @@ details[open] > summary > span {
 
   .home-hero h1 {
     font-size: 33px;
-  }
-
-  .home-privacy {
-    font-size: 11px;
   }
 
   .brand {
@@ -1880,12 +1888,62 @@ details[open] > summary > span {
     height: 175px;
   }
 
-  .scientific {
-    font-size: 11px;
-  }
-
   .camera-action {
     flex-basis: 100%;
+  }
+}
+
+@media (max-width: 340px) {
+  .container {
+    width: calc(100% - 24px);
+  }
+
+  .brand {
+    font-size: 20px;
+  }
+
+  .brand-mark {
+    width: 24px;
+  }
+
+  .header-cta {
+    width: 44px;
+    padding: 0;
+  }
+
+  .header-cta-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .home-hero {
+    padding: 26px 18px 24px;
+  }
+
+  .home-hero h1 {
+    font-size: 30px;
+  }
+
+  .home-cta {
+    gap: 10px;
+    padding-inline: 18px;
+    white-space: nowrap;
+  }
+
+  .filter {
+    padding-inline: 8px;
+  }
+
+  .plant-card-art {
+    height: 150px;
+  }
+
+  .plant-card h3 {
+    font-size: 15px;
   }
 }
 
@@ -1914,7 +1972,7 @@ details[open] > summary > span {
 
   .scanner-stage {
     aspect-ratio: auto;
-    height: clamp(150px, 42svh, 230px);
+    height: clamp(160px, 56svh, 320px);
     min-height: 0;
     max-height: none;
   }
@@ -1966,6 +2024,94 @@ details[open] > summary > span {
 
   .home-privacy {
     margin-top: 12px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .container {
+    width: min(1520px, calc(100% - 120px));
+    max-width: 1520px;
+  }
+
+  .home-hero {
+    display: flex;
+    align-items: center;
+    min-height: min(58svh, 640px);
+    padding: 64px 80px;
+  }
+
+  .home-description {
+    max-width: 580px;
+    font-size: 18px;
+  }
+
+  .home-privacy {
+    font-size: 13px;
+  }
+
+  .home-specimen {
+    right: 80px;
+    bottom: 56px;
+    font-size: 13px;
+  }
+
+  .home-specimen img {
+    width: 300px;
+    height: 250px;
+  }
+
+  .home-support {
+    padding-top: 36px;
+  }
+
+  .home-preparation h2, .model-availability h3 {
+    font-size: 16px;
+  }
+
+  .home-support p, .model-availability p {
+    font-size: 15px;
+    max-width: 600px;
+  }
+
+  .desktop-nav a, .header-cta, .text-link {
+    font-size: 14px;
+  }
+
+  .footer-inner {
+    font-size: 13px;
+  }
+
+  .catalog-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .scanner-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(320px, 1fr);
+    gap: 28px;
+  }
+}
+
+@media (min-width: 2200px) {
+  .container {
+    width: min(1760px, calc(100% - 160px));
+    max-width: 1760px;
+  }
+
+  .home-hero {
+    padding: 80px 100px;
+  }
+
+  .home-hero h1 {
+    font-size: 76px;
+  }
+
+  .home-specimen img {
+    width: 360px;
+    height: 300px;
+  }
+
+  .plant-card-art {
+    height: 320px;
   }
 }
 

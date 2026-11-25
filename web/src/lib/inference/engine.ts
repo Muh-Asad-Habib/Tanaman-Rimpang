@@ -33,7 +33,7 @@ export class InferenceEngine {
     this.clearTimeout();
     this.gate.reset();
     this.controller = new AbortController();
-    this.report({ status: "loading", message: "Memeriksa ketersediaan model..." });
+    this.report({ status: "loading", message: "Memeriksa ketersediaan model…" });
     try {
       const manifest = await fetchManifest(this.controller.signal);
       if (generation !== this.generation || this.disposed) return;

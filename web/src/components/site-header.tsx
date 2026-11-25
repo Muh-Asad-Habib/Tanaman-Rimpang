@@ -54,7 +54,7 @@ export function SiteHeader() {
       <nav className="desktop-nav" aria-label="Navigasi utama">
         {links.map((item) => <Link key={item.href} href={item.href} aria-current={currentPage(item.href)}>{item.text}</Link>)}
       </nav>
-      <Link href="/pindai" className="button button-outline header-cta" aria-current={currentPage("/pindai")} onClick={() => setOpen(false)}><Icon name="camera" size={17} /> Pindai</Link>
+      <Link href="/pindai" className="button button-outline header-cta" aria-current={currentPage("/pindai")} onClick={() => setOpen(false)}><Icon name="camera" size={17} /> <span className="header-cta-label">Pindai</span></Link>
       <button ref={toggle} className="mobile-menu icon-button" aria-label={open ? "Tutup menu" : "Buka menu"}
         aria-expanded={open} aria-controls="mobile-navigation" onClick={() => setOpen(!open)}><Icon name={open ? "close" : "menu"} /></button>
     </div>

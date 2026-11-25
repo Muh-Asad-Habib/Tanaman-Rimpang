@@ -12,8 +12,11 @@ putih, lempuyang, lengkuas, temu hitam, temu kunci, dan temulawak.
 
 - Pindai langsung dari kamera, sampai 5 rimpang sekaligus
 - Bisa juga memakai foto dari galeri
-- Katalog berisi keterangan setiap jenis rimpang
-- Tampilan menyesuaikan HP, tablet, dan desktop
+- Katalog berisi keterangan setiap jenis rimpang, bisa dicari dan difilter per
+  kelompok. Pencarian dan filter tersimpan di URL (`/jelajah?q=temu&kelompok=...`),
+  jadi tautannya bisa dibagikan.
+- Tampilan responsif, sudah diuji dari layar 280px sampai 2560px, termasuk HP
+  posisi landscape, tablet, dan monitor lebar.
 
 ## Cara kerja
 
@@ -54,6 +57,15 @@ Buka http://localhost:3000 lalu masuk ke menu **Pindai**. Untuk versi
 produksi, jalankan `npm run build` kemudian `npm start`.
 
 Browser hanya mengizinkan kamera di localhost atau HTTPS.
+
+Perintah pemeriksaan (jalankan di folder `web`):
+
+```powershell
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
 ## Struktur folder
 

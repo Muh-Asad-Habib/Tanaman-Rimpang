@@ -28,7 +28,7 @@ export function Scanner() {
   const [stageRatio, setStageRatio] = useState(4 / 3);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState("");
-  const [state, setState] = useState<EngineState>({ status: "loading", message: "Memeriksa ketersediaan model..." });
+  const [state, setState] = useState<EngineState>({ status: "loading", message: "Memeriksa ketersediaan model…" });
   const [result, setResult] = useState<FrameResult | null>(null);
   const video = useRef<HTMLVideoElement>(null);
   const stage = useRef<HTMLDivElement>(null);

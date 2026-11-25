@@ -14,7 +14,7 @@ export default function Home() {
         <p className="home-privacy"><Icon name="shield" size={17} />Kamera hanya aktif setelah Anda mengizinkan. Gambar tidak diunggah.</p>
       </div>
       <div className="home-specimen" aria-hidden="true">
-        <Image src="/images/rimpang/jahe.webp" alt="" width={180} height={150} sizes="180px" loading="eager" />
+        <Image src="/images/rimpang/jahe.webp" alt="" width={360} height={300} sizes="(min-width: 2200px) 360px, (min-width: 1600px) 300px, 180px" loading="eager" />
         <span>Jahe · satu dari sepuluh jenis</span>
       </div>
     </section>
