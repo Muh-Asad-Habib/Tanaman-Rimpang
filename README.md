@@ -1,4 +1,18 @@
+<div align="center">
+
 # Tanaman Rimpang
+
+**Kenali rimpang lewat kamera, langsung di browser.**
+
+![Next.js](https://img.shields.io/badge/Next.js-16-000?logo=nextdotjs)
+![React](https://img.shields.io/badge/React-19-149eca?logo=react&logoColor=white)
+![ONNX Runtime Web](https://img.shields.io/badge/ONNX%20Runtime-Web-005ced?logo=onnx&logoColor=white)
+![WebGPU](https://img.shields.io/badge/WebGPU-%2B%20WASM-2f6f3e)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+![Ruang pindai di desktop dan HP](docs/preview/pindai.webp)
+
+</div>
 
 Aplikasi web untuk mengenali jenis rimpang lewat kamera. Arahkan kamera HP atau
 laptop ke rimpang, lalu aplikasi akan memberi kotak pada tiap rimpang yang
@@ -8,9 +22,19 @@ tidak dikirim ke server mana pun.
 Ada 10 jenis yang bisa dikenali: jahe, jahe merah, kencur, kunyit, kunyit
 putih, lempuyang, lengkuas, temu hitam, temu kunci, dan temulawak.
 
+## Preview
+
+| Beranda | Katalog |
+| --- | --- |
+| ![Beranda](docs/preview/home.webp) | ![Katalog rimpang](docs/preview/jelajah.webp) |
+| **Detail rimpang** | **Tampilan HP** |
+| ![Detail kunyit](docs/preview/detail.webp) | ![Beranda, katalog, dan ruang pindai di HP](docs/preview/mobile.webp) |
+
 ## Fitur
 
-- Pindai langsung dari kamera, sampai 5 rimpang sekaligus
+- Pindai langsung dari kamera, sampai 5 rimpang sekaligus. Kalau hanya satu
+  rimpang, labelnya cukup nama jenis; kalau lebih, tiap rimpang diberi nomor
+  1–5 yang tetap stabil selama objek terlihat.
 - Bisa juga memakai foto dari galeri
 - Katalog berisi keterangan setiap jenis rimpang, bisa dicari dan difilter per
   kelompok. Pencarian dan filter tersimpan di URL (`/jelajah?q=temu&kelompok=...`),
@@ -35,11 +59,32 @@ rendah, rimpang ditandai "belum dikenali". Kedua model disimpan dalam format
 ONNX dan dijalankan dengan ONNX Runtime Web. Aplikasi memakai WebGPU bila
 tersedia, dan otomatis beralih ke CPU (WASM) bila tidak.
 
+## Hasil uji kamera
+
+Aplikasi diuji lewat kamera tiruan (Playwright) yang memutar 30 foto uji,
+3 per jenis, dengan beberapa gangguan. Angka di bawah adalah tebakan pertama
+yang benar.
+
+| Kondisi | Benar |
+| --- | --- |
+| Normal | 28/30 (93%) |
+| Diputar 30° / 90° | 29/30 / 30/30 |
+| Gelap 50% | 27/30 |
+| Terlalu terang 150% | 23/30 |
+| Buram (blur 3px) | 30/30 |
+| Objek jauh (skala 50%) | 29/30 |
+| Noise sedang / berat | 27/30 / 22/30 |
+| **Total** | **245/270 (91%)** |
+
+Model paling sering keliru pada kunyit putih (sering tertebak temu hitam),
+serta saat cahaya terlalu terang atau gambar sangat berbintik. Ini uji
+ringan, bukan evaluasi resmi.
+
 ## Teknologi
 
 | Bagian | Teknologi |
 | --- | --- |
-| Web | Next.js, TypeScript, Tailwind CSS |
+| Web | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
 | Model | YOLO11n, EfficientNetV2-B0 + CBAM (PyTorch) |
 | Inferensi | ONNX Runtime Web |
 
@@ -73,6 +118,7 @@ npm run build
 web/       aplikasi web beserta model ONNX
 shared/    daftar kelas dan format data
 training/  pengolahan dataset dan pelatihan model
+docs/      gambar preview README
 ```
 
 ## Kredit foto katalog
@@ -80,9 +126,9 @@ training/  pengolahan dataset dan pelatihan model
 Foto katalog di `web/public/images/rimpang/` sudah dihapus latarnya agar
 setiap rimpang tampil utuh. Lima foto berasal dari Wikimedia Commons dan
 satu dari Flickr; semuanya tetap memakai lisensi aslinya (CC BY / CC BY-SA /
-GFDL). Empat foto lainnya diambil
-dari dataset proyek. Rincian penulis dan lisensi ada di
-`web/src/data/image-credits.json` dan ditampilkan di halaman Panduan.
+GFDL). Empat foto lainnya diambil dari dataset proyek. Rincian penulis dan
+lisensi ada di `web/src/data/image-credits.json` dan ditampilkan di halaman
+Panduan.
 
 ## Lisensi
 
