@@ -1,0 +1,72 @@
+{
+  "jahe": {
+    "author": "Herusutimbul",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Jahe_Emprit_Iris.jpg"
+  },
+  "jahe-merah": {
+    "author": "Tim dataset",
+    "source": "Dataset proyek",
+    "license": "internal",
+    "licenseUrl": "",
+    "url": ""
+  },
+  "kencur": {
+    "author": "Hariadhi",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Kaempferia_galanga.jpg"
+  },
+  "kunyit": {
+    "author": "Yosri",
+    "source": "Wikimedia Commons",
+    "license": "GFDL",
+    "licenseUrl": "http://www.gnu.org/copyleft/fdl.html",
+    "url": "https://commons.wikimedia.org/wiki/File:YosriKunyitHidup.jpg"
+  },
+  "kunyit-putih": {
+    "author": "Yercaud-elango",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Curcuma_zedoaria-3-bsi-yercaud-salem-India.jpg"
+  },
+  "lempuyang": {
+    "author": "Tim dataset",
+    "source": "Dataset proyek",
+    "license": "internal",
+    "licenseUrl": "",
+    "url": ""
+  },
+  "lengkuas": {
+    "author": "liza31337",
+    "source": "Flickr",
+    "license": "CC BY 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0/",
+    "url": "https://www.flickr.com/photos/85763206@N00/454723626"
+  },
+  "temu-hitam": {
+    "author": "Tim dataset",
+    "source": "Dataset proyek",
+    "license": "internal",
+    "licenseUrl": "",
+    "url": ""
+  },
+  "temu-kunci": {
+    "author": "FotoosVanRobin",
+    "source": "Wikimedia Commons",
+    "license": "CC BY-SA 2.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/2.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Boesenbergia_rotunda_1.jpg"
+  },
+  "temulawak": {
+    "author": "Tim dataset",
+    "source": "Dataset proyek",
+    "license": "internal",
+    "licenseUrl": "",
+    "url": ""
+  }
+}

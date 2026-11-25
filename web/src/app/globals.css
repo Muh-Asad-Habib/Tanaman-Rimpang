@@ -900,6 +900,34 @@ details[open] > summary > span {
   border-radius: 12px;
 }
 
+.credits-section {
+  margin-top: 56px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+  max-width: 900px;
+}
+
+.credits-section h2 {
+  margin-block: 10px 8px;
+  font-size: 28px;
+}
+
+.credits-list {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.credits-list a, .botanical-note .fine-print a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .guide-cta {
   display: flex;
   align-items: center;

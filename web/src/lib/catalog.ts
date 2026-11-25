@@ -1,4 +1,8 @@
 import taxonomy from "@shared/labels.json";
+import imageCredits from "@/data/image-credits.json";
+
+export type ImageCredit = { author: string; source: string; license: string; licenseUrl: string; url: string };
+const credits: Record<string, ImageCredit> = imageCredits;
 
 const descriptions = [
   { scientific: "Zingiber officinale", family: "Hangat & aromatik", color: "#e8dec9", subtitle: "Kehangatan yang akrab di dapur kita.", shape: "Rimpang bercabang, beruas jelas, dengan kulit cokelat muda dan daging pucat kekuningan.", aroma: "Pedas hangat dan segar saat dipotong.", use: "Bumbu masakan, wedang, dan campuran minuman tradisional.", distinguish: "Perhatikan ruas, tekstur kulit, dan seratnya. Warna luar saja tidak cukup membedakan varietas jahe." },
@@ -17,6 +21,7 @@ export const plants = taxonomy.labels.map((label, index) => ({
   ...label, ...descriptions[index],
   image: `/images/rimpang/${label.slug}.webp`,
   photo: `/images/rimpang/${label.slug}-photo.webp`,
+  imageCredit: credits[label.slug],
   source: `https://powo.science.kew.org/results?q=${encodeURIComponent(descriptions[index].scientific.replace(" (nama rujukan)", ""))}`,
 }));
 export type Plant = (typeof plants)[number];

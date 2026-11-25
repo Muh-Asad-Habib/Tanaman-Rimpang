@@ -75,6 +75,15 @@ shared/    daftar kelas dan format data
 training/  pengolahan dataset dan pelatihan model
 ```
 
+## Kredit foto katalog
+
+Foto katalog di `web/public/images/rimpang/` sudah dihapus latarnya agar
+setiap rimpang tampil utuh. Lima foto berasal dari Wikimedia Commons dan
+satu dari Flickr; semuanya tetap memakai lisensi aslinya (CC BY / CC BY-SA /
+GFDL). Empat foto lainnya diambil
+dari dataset proyek. Rincian penulis dan lisensi ada di
+`web/src/data/image-credits.json` dan ditampilkan di halaman Panduan.
+
 ## Lisensi
 
 Kode di repositori ini memakai [MIT License](LICENSE). Dataset dan pustaka
