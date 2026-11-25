@@ -12,6 +12,9 @@
 
 ![Ruang pindai di desktop dan HP](docs/preview/pindai.webp)
 
+[Preview](#preview) · [Fitur](#fitur) · [Cara kerja](#cara-kerja) ·
+[Akurasi](#hasil-akurasi-model) · [Menjalankan](#menjalankan)
+
 </div>
 
 Aplikasi web untuk mengenali jenis rimpang lewat kamera. Arahkan kamera HP atau
@@ -21,6 +24,10 @@ tidak dikirim ke server mana pun.
 
 Ada 10 jenis yang bisa dikenali: jahe, jahe merah, kencur, kunyit, kunyit
 putih, lempuyang, lengkuas, temu hitam, temu kunci, dan temulawak.
+
+| 10 jenis | 5 rimpang | 98% | 0 upload |
+| :---: | :---: | :---: | :---: |
+| rimpang dikenali | sekaligus per frame | jenis benar setelah terdeteksi | semua diproses di perangkat |
 
 ## Preview
 
@@ -35,7 +42,7 @@ putih, lempuyang, lengkuas, temu hitam, temu kunci, dan temulawak.
 - Pindai langsung dari kamera, sampai 5 rimpang sekaligus. Kalau hanya satu
   rimpang, labelnya cukup nama jenis; kalau lebih, tiap rimpang diberi nomor
   1–5 yang tetap stabil selama objek terlihat.
-- Bisa juga memakai foto dari galeri
+- Bisa juga memakai foto dari galeri.
 - Katalog berisi keterangan setiap jenis rimpang, bisa dicari dan difilter per
   kelompok. Pencarian dan filter tersimpan di URL (`/jelajah?q=temu&kelompok=...`),
   jadi tautannya bisa dibagikan.
@@ -52,8 +59,6 @@ flowchart LR
   D --> E[Stabilkan antar-frame]
   E --> F[Kotak + nama + skor]
 ```
-
-Singkatnya, aplikasi bekerja seperti dua orang yang berbagi tugas:
 
 1. **Mencari** – YOLO11n melihat gambar (diperkecil ke 416×416) dan menandai
    setiap benda yang berupa rimpang dengan kotak. Model ini belum peduli
@@ -89,49 +94,43 @@ data validasi, lalu data uji dipakai sekali untuk laporan di bawah.
 ## Hasil akurasi model
 
 Diukur pada data uji (824 foto, 1.044 rimpang) memakai ambang yang sama
-dengan aplikasi, kecuali mAP yang memakai cara hitung standar Ultralytics.
+dengan aplikasi.
 
-**Deteksi (YOLO11n)**
-
-| Metrik | Nilai |
-| --- | --- |
-| mAP@50 | 86,6% |
-| mAP@50–95 | 78,0% |
-| Precision (ambang aplikasi) | 89,2% |
-| Recall (ambang aplikasi) | 75,9% |
-
-**Klasifikasi jenis (EfficientNetV2-B0 + CBAM)**
-
-| Metrik | Nilai |
-| --- | --- |
-| Akurasi pada potongan rimpang yang terdeteksi | 98,2% |
-| Macro F1 pada potongan yang terdeteksi | 98,4% |
-| Akurasi pada potongan kotak asli (ground truth) | 94,5% |
-| Macro F1 pada potongan kotak asli | 95,0% |
-
-**Keseluruhan (deteksi + klasifikasi)**
-
-| Metrik | Nilai |
-| --- | --- |
-| Precision hasil yang ditampilkan | 88,8% |
-| Rimpang yang ditemukan dan dikenali benar | 74,2% |
-| Macro F1 | 82,3% |
+| Tahap | Metrik utama | Nilai |
+| --- | --- | --- |
+| Deteksi (YOLO11n) | mAP@50 | **86,6%** |
+| Klasifikasi (EfficientNetV2-B0 + CBAM) | Akurasi jenis pada rimpang yang terdeteksi | **98,2%** |
+| Keseluruhan | Precision hasil yang ditampilkan | **88,8%** |
+| Keseluruhan | Rimpang yang ditemukan dan dikenali benar | **74,2%** |
 
 <details>
-<summary>F1 per jenis (potongan kotak asli, dengan ambang aplikasi)</summary>
+<summary>Rincian metrik</summary>
 
-| Jenis | F1 |
+**Deteksi**
+
+| Metrik | Nilai |
 | --- | --- |
-| Lengkuas | 99,6% |
-| Jahe merah | 99,0% |
-| Lempuyang | 98,9% |
-| Temu kunci | 97,8% |
-| Jahe | 95,0% |
-| Kunyit | 94,4% |
-| Temulawak | 93,9% |
-| Temu hitam | 92,6% |
-| Kunyit putih | 91,9% |
-| Kencur | 88,3% |
+| mAP@50 / mAP@50–95 (cara hitung Ultralytics) | 86,6% / 78,0% |
+| Precision / recall (ambang aplikasi) | 89,2% / 75,9% |
+
+**Klasifikasi**
+
+| Potongan yang dinilai | Akurasi | Macro F1 |
+| --- | --- | --- |
+| Hasil deteksi model | 98,2% | 98,4% |
+| Kotak asli (ground truth) | 94,5% | 95,0% |
+
+**Keseluruhan:** macro F1 82,3%.
+
+**F1 per jenis** (kotak asli, dengan ambang aplikasi)
+
+| Jenis | F1 | Jenis | F1 |
+| --- | --- | --- | --- |
+| Lengkuas | 99,6% | Kunyit | 94,4% |
+| Jahe merah | 99,0% | Temulawak | 93,9% |
+| Lempuyang | 98,9% | Temu hitam | 92,6% |
+| Temu kunci | 97,8% | Kunyit putih | 91,9% |
+| Jahe | 95,0% | Kencur | 88,3% |
 
 </details>
 
@@ -141,6 +140,7 @@ terlewat, terutama pada foto yang berisi banyak rimpang berdempetan (pada foto
 berisi 5 rimpang, hanya ~23% yang terdeteksi). Untuk hasil terbaik, pindai
 satu sampai beberapa rimpang yang tidak saling menumpuk.
 
+> [!WARNING]
 > Model ini masih **eksperimental**: kotak pada dataset dibuat otomatis dan
 > label diambil dari nama folder tanpa pemeriksaan manual, serta belum diuji
 > terhadap foto yang bukan rimpang.
@@ -151,16 +151,13 @@ Selain evaluasi model di atas, aplikasi juga diuji lewat kamera tiruan
 (Playwright) yang memutar 30 foto uji, 3 per jenis, dengan beberapa gangguan.
 Angka di bawah adalah tebakan pertama yang benar.
 
-| Kondisi | Benar |
-| --- | --- |
-| Normal | 28/30 (93%) |
-| Diputar 30° / 90° | 29/30 / 30/30 |
-| Gelap 50% | 27/30 |
-| Terlalu terang 150% | 23/30 |
-| Buram (blur 3px) | 30/30 |
-| Objek jauh (skala 50%) | 29/30 |
-| Noise sedang / berat | 27/30 / 22/30 |
-| **Total** | **245/270 (91%)** |
+| Kondisi | Benar | Kondisi | Benar |
+| --- | --- | --- | --- |
+| Normal | 28/30 | Buram (blur 3px) | 30/30 |
+| Diputar 30° | 29/30 | Objek jauh (skala 50%) | 29/30 |
+| Diputar 90° | 30/30 | Noise sedang | 27/30 |
+| Gelap 50% | 27/30 | Noise berat | 22/30 |
+| Terlalu terang 150% | 23/30 | **Total** | **245/270 (91%)** |
 
 Model paling sering keliru pada kunyit putih (sering tertebak temu hitam),
 serta saat cahaya terlalu terang atau gambar sangat berbintik. Ini uji
@@ -171,8 +168,8 @@ ringan, bukan evaluasi resmi.
 | Bagian | Teknologi |
 | --- | --- |
 | Web | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
-| Model | YOLO11n, EfficientNetV2-B0 + CBAM (PyTorch) |
-| Inferensi | ONNX Runtime Web |
+| Pelatihan | PyTorch, Ultralytics (YOLO11n), timm (EfficientNetV2-B0) |
+| Inferensi | ONNX Runtime Web (WebGPU / WASM) |
 
 ## Menjalankan
 
@@ -187,7 +184,10 @@ npm run dev
 Buka http://localhost:3000 lalu masuk ke menu **Pindai**. Untuk versi
 produksi, jalankan `npm run build` kemudian `npm start`.
 
-Browser hanya mengizinkan kamera di localhost atau HTTPS.
+> [!NOTE]
+> Browser hanya mengizinkan kamera di `localhost` atau HTTPS. Untuk mencoba
+> dari HP di jaringan yang sama, pakai tunnel HTTPS atau unggah foto dari
+> galeri.
 
 Perintah pemeriksaan (jalankan di folder `web`):
 
