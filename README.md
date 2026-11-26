@@ -13,7 +13,7 @@
 ![Ruang pindai di desktop dan HP](docs/preview/pindai.webp)
 
 [Preview](#preview) · [Fitur](#fitur) · [Cara kerja](#cara-kerja) ·
-[Akurasi](#hasil-akurasi-model) · [Menjalankan](#menjalankan)
+[Akurasi](#hasil-akurasi-model) · [Penelitian](#konteks-penelitian) · [Menjalankan](#menjalankan)
 
 </div>
 
@@ -162,6 +162,94 @@ Angka di bawah adalah tebakan pertama yang benar.
 Model paling sering keliru pada kunyit putih (sering tertebak temu hitam),
 serta saat cahaya terlalu terang atau gambar sangat berbintik. Ini uji
 ringan, bukan evaluasi resmi.
+
+## Konteks penelitian
+
+Proyek ini adalah implementasi penelitian identifikasi rimpang obat lokal
+Sulawesi Selatan dengan pendekatan hibrida **lokalisasi (YOLOv11) →
+klasifikasi (EfficientNetV2 + transfer learning) → atensi (CBAM)**, dilengkapi
+Grad-CAM agar keputusan model bisa ditelusuri.
+
+**Rumusan masalah dan cara repo menjawabnya**
+
+| Rumusan masalah | Implementasi |
+| --- | --- |
+| 1. Merancang sistem identifikasi rimpang berbasis YOLOv11 + EfficientNetV2-CBAM | `training/scripts/train_detector.py`, `train_classifier.py`, aplikasi web `web/` |
+| 2. Mengukur kinerja (akurasi, presisi, recall, F1) | `evaluate_models.py` → `evaluation-report.json` (ambang dipilih di validasi, uji sekali) |
+| 3. Mengukur kontribusi YOLOv11 dan CBAM | studi ablasi `run_ablation.py` (penuh vs tanpa CBAM vs tanpa YOLO) |
+| 4. Menilai ketahanan dan keterjelasan model | `run_robustness.py` (kondisi foto + degradasi) dan `gradcam.py` |
+
+**Kebaruan yang didukung kode**
+
+- Dataset lokal dengan `specimenId` per rimpang fisik, metadata pengambilan
+  (lokasi, pencahayaan, latar, kondisi), dan tanda `expertValidated`.
+- Pembagian latih/validasi/uji **per spesimen**: foto dari spesimen yang sama
+  tidak pernah tersebar ke dua bagian.
+- Studi ablasi dan uji ketahanan pada citra uji yang sama, plus Grad-CAM yang
+  mengukur berapa persen perhatian model jatuh di dalam kotak rimpang.
+
+**Target dan peta jalan**
+
+| Fase | Fokus | Target |
+| --- | --- | --- |
+| 1 | Dataset lokal tervalidasi ahli, model hibrida, evaluasi + ablasi | akurasi uji **≥ 85%** (dicatat di `researchTarget` laporan evaluasi) |
+| 2 | Uji lapangan, ketahanan kondisi nyata, perluasan jenis | — |
+| 3 | Pemanfaatan oleh petani, UMKM jamu, dan pendidikan | — |
+
+Penelitian ini mendukung SDGs 3 (kesehatan, obat herbal yang tepat jenis),
+SDGs 8 (nilai ekonomi rimpang bagi petani/UMKM), dan SDGs 9 (inovasi
+teknologi), sejalan dengan Rencana Induk Riset Nasional bidang kesehatan dan
+pangan.
+
+> [!IMPORTANT]
+> Angka di [Hasil akurasi model](#hasil-akurasi-model) berasal dari dataset
+> sekunder berlabel otomatis. Klaim penelitian baru sah setelah model dilatih
+> ulang dengan dataset lokal Sulsel yang divalidasi ahli.
+
+### Mengumpulkan dataset lapangan
+
+Setiap gambar di manifest (`shared/dataset-manifest.schema.json`) sebaiknya
+mencatat:
+
+```json
+{
+  "specimenId": "kunyit-maros-007",
+  "expertValidated": true,
+  "capture": {
+    "location": "maros", "lighting": "matahari-langsung",
+    "background": "tanah", "condition": "dipanen"
+  }
+}
+```
+
+- Satu `specimenId` = satu rimpang fisik; foto dari beberapa sudut memakai ID
+  yang sama.
+- `condition` salah satu dari `lapangan`, `dipanen`, `dibersihkan`, `diiris`.
+- Variasikan pencahayaan, latar, dan lokasi agar uji ketahanan per kondisi
+  bermakna; gambar tanpa metadata dilaporkan sebagai `tidak-dicatat`.
+
+### Protokol eksperimen
+
+Jalankan dari folder root setelah `evaluate_models.py` menghasilkan
+`frozen-thresholds.json` untuk model penuh (path `runs/...` hanya contoh;
+sesuaikan dengan lokasi checkpoint Anda).
+
+```powershell
+# Ablasi: latih varian tanpa CBAM dan tanpa YOLO, lalu bandingkan
+python -m training.scripts.train_classifier --data prepared/classifier --config training/configs/classifier.no-cbam.json --output runs/no-cbam
+python -m training.scripts.run_ablation build --prepared prepared
+python -m training.scripts.train_classifier --data prepared/ablation-whole-image --output runs/whole-image
+python -m training.scripts.run_ablation evaluate --prepared prepared --data-root data --detector runs/detector/best.pt --full runs/classifier/best.pt --no-cbam runs/no-cbam/best.pt --whole-image runs/whole-image/best.pt --frozen runs/eval/frozen-thresholds.json --output runs/ablation
+
+# Ketahanan: degradasi sintetis (gelap, terang, kontras rendah, buram, noise, JPEG)
+python -m training.scripts.run_robustness --prepared prepared --data-root data --detector runs/detector/best.pt --classifier runs/classifier/best.pt --frozen runs/eval/frozen-thresholds.json --output runs/robustness.json
+
+# Grad-CAM: overlay per kelas + proporsi aktivasi di dalam kotak rimpang
+python -m training.scripts.gradcam --prepared prepared --data-root data --classifier runs/classifier/best.pt --output runs/gradcam
+```
+
+Metrik per kondisi foto nyata (`captureStrata`) sudah otomatis masuk ke
+laporan `evaluate_models.py`.
 
 ## Teknologi
 
