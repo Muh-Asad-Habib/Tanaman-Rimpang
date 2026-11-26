@@ -41,8 +41,10 @@ LIMITATIONS = [
     "capture-session independence. Human annotation/provenance review remains required.",
     "objects: [] measures a combined annotated negative/unknown-frame false-accept rate. The "
     "schema cannot distinguish unknown rhizomes from non-rhizomes or measure unseen populations.",
-    "No occlusion, capture-domain or temporal labels exist in the master schema. Small holdout "
-    "group counts and missing scenario strata limit generalization; no accuracy target is implied.",
+    "Capture-condition strata (lighting/background/location/condition) are measured only for images "
+    "whose manifest records capture metadata; unrecorded images are reported as 'tidak-dicatat'. "
+    "Synthetic degradations (run_robustness) approximate, but do not replace, real field strata. "
+    "No occlusion or temporal labels exist; small holdout group counts limit generalization.",
 ]
 
 
@@ -685,7 +687,7 @@ def needed_anchors(detections, thresholds=None):
             for item in non_max_suppression(detections, score, iou)[:MAX_OBJECTS]}
 
 
-def predict_split(records, split, data_root, backend, thresholds=None):
+def predict_split(records, split, data_root, backend, thresholds=None, transform=None):
     from PIL import Image
     from training.common import source_path
     if split not in ("valid", "test") or (split == "test" and thresholds is None):
@@ -705,6 +707,8 @@ def predict_split(records, split, data_root, backend, thresholds=None):
             if original.getexif().get(274, 1) not in (1, None):
                 raise ValueError(f"Normalize EXIF before annotation/evaluation: {row['path']}")
             image = original.convert("RGB")
+            if transform is not None:
+                image = transform(image, row["path"])
             output, geometry = backend.detect(image)
             detections, candidate_count = decode_detector(output, geometry, floor)
             anchors = needed_anchors(detections, thresholds)

@@ -213,6 +213,8 @@ def evaluate(args):
             **predictions_document(test_frames, input_fingerprint), "frozenThresholdsSha256": frozen_sha,
         })
     test_metrics = evaluate_frames(test_frames, thresholds)
+    from training.robustness import capture_strata
+    test_metrics["captureStrata"] = capture_strata(test_frames, records, thresholds)
     metrics_path = args.output / "ultralytics-metrics.json"
     if metrics_path.exists():
         detector_metrics = read_json(metrics_path)
