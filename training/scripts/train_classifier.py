@@ -2,12 +2,17 @@ import argparse
 import random
 from pathlib import Path
 
+from training.ablation import WHOLE_IMAGE_FOLDER
 from training.common import ROOT, digest, read_json, taxonomy
 from training.evaluation import atomic_json, atomic_write, finite_number, prepared_dataset_binding
 
 
-def validate_resume(checkpoint, config, class_slugs, dataset_binding, config_sha):
+DATA_VARIANTS = ("classifier", WHOLE_IMAGE_FOLDER)
+
+
+def validate_resume(checkpoint, config, class_slugs, dataset_binding, config_sha, data_variant="classifier"):
     if (checkpoint.get("formatVersion") != 1 or checkpoint.get("config") != config
+            or checkpoint.get("dataVariant", "classifier") != data_variant
             or checkpoint.get("classSlugs") != class_slugs
             or checkpoint.get("datasetBinding") != dataset_binding
             or checkpoint.get("configFileSha256") != config_sha):
@@ -28,7 +33,8 @@ def validate_resume(checkpoint, config, class_slugs, dataset_binding, config_sha
 
 def main():
     parser = argparse.ArgumentParser(description="Train EfficientNetV2-B0 +/- CBAM on grouped ROI data.")
-    parser.add_argument("--data", type=Path, required=True, help="prepared/classifier directory")
+    parser.add_argument("--data", type=Path, required=True,
+                        help=f"prepared/classifier, or prepared/{WHOLE_IMAGE_FOLDER} for the no-YOLO ablation")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--config", type=Path, default=ROOT / "training" / "configs" / "classifier.json")
     parser.add_argument("--device", default="cuda")
@@ -40,8 +46,9 @@ def main():
         parser.error("Output exists; use a new experiment directory.")
     if args.resume and (args.resume.resolve().parent != args.output.resolve() or args.resume.name != "last.pt"):
         parser.error("Resume must use last.pt in the original output directory.")
-    if args.data.resolve() != args.data.parent.resolve() / "classifier":
-        parser.error("--data must be the classifier directory inside a frozen prepared dataset.")
+    data_variant = args.data.resolve().name
+    if data_variant not in DATA_VARIANTS or args.data.resolve() != args.data.parent.resolve() / data_variant:
+        parser.error(f"--data must be one of {DATA_VARIANTS} inside a frozen prepared dataset.")
     dataset_binding, _, inspection = prepared_dataset_binding(args.data.parent)
     if dataset_binding["cropMargin"] != 0.1:
         parser.error("Prepared crops must use the approved margin 0.1.")
@@ -93,7 +100,7 @@ def main():
     history = []
     if args.resume:
         checkpoint = torch.load(args.resume, map_location="cpu", weights_only=False)
-        validate_resume(checkpoint, config, class_slugs, dataset_binding, config_sha)
+        validate_resume(checkpoint, config, class_slugs, dataset_binding, config_sha, data_variant)
         model.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         start, best, stale, history = checkpoint["epoch"] + 1, checkpoint["best"], checkpoint["stale"], checkpoint["history"]
@@ -111,7 +118,7 @@ def main():
             atomic_write(args.output / "best.pt", lambda stream: torch.save(checkpoint, stream))
         else:
             best_checkpoint = torch.load(args.output / "best.pt", map_location="cpu", weights_only=False)
-            validate_resume(best_checkpoint, config, class_slugs, dataset_binding, config_sha)
+            validate_resume(best_checkpoint, config, class_slugs, dataset_binding, config_sha, data_variant)
             if (best_checkpoint["best"] != best or best_checkpoint["epoch"] > checkpoint["epoch"]
                     or best_checkpoint["history"] != history[:best_checkpoint["epoch"] + 1]):
                 raise ValueError("Best checkpoint does not belong to this resume history.")
@@ -150,7 +157,7 @@ def main():
         history.append({"epoch": epoch + 1, "trainLoss": total_loss / len(train), "validMacroF1": macro_f1, "confusion": matrix.tolist()})
         checkpoint = {
             "formatVersion": 1, "config": config, "classSlugs": class_slugs,
-            "datasetBinding": dataset_binding, "configFileSha256": config_sha,
+            "datasetBinding": dataset_binding, "configFileSha256": config_sha, "dataVariant": data_variant,
             "state_dict": model.state_dict(), "optimizer": optimizer.state_dict(),
             "epoch": epoch, "best": best, "stale": stale, "history": history,
             "loaderRng": generator.get_state(), "torchRng": torch.get_rng_state(),

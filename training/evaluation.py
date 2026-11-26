@@ -781,6 +781,8 @@ def checkpoint_eligibility(classifier_checkpoint, detector_binding, dataset_bind
         unmet.append("Detector checkpoint lacks this exact prepared dataset fingerprint and checkpoint receipt.")
     elif detector_binding.get("config", {}).get("model") != "yolo11n.pt":
         unmet.append("Detector training provenance is not the approved YOLO11n configuration.")
+    if classifier_checkpoint.get("dataVariant", "classifier") != "classifier":
+        unmet.append("Classifier was trained on whole-image ablation data, not detector crops; ablation only.")
     config = classifier_checkpoint["config"]
     if (config.get("architecture") != "tf_efficientnetv2_b0.in1k" or config.get("cbam") is not True
             or config.get("inputSize") != 224 or config.get("mean") != [0.5] * 3 or config.get("std") != [0.5] * 3):
