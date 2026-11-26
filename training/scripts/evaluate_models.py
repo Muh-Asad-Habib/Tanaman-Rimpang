@@ -11,7 +11,7 @@ from training.evaluation import (
     atomic_json, calibrate_validation, checked_thresholds, checkpoint_eligibility,
     detector_checkpoint_binding, evaluate_frames, finite_number, image_tensor,
     json_fingerprint, load_predictions, predictions_document, prepared_dataset_binding,
-    predict_split, protocol,
+    predict_split, protocol, research_target,
 )
 
 
@@ -254,6 +254,7 @@ def evaluate(args):
             "valid": {**valid_metrics, "ultralyticsDetector": detector_metrics["splits"]["valid"]},
             "test": {**test_metrics, "ultralyticsDetector": detector_metrics["splits"]["test"]},
         },
+        "researchTarget": research_target(test_metrics),
         "limitations": LIMITATIONS,
         "deployment": {
             "status": "blocked-pending-parity-and-review",
@@ -288,6 +289,11 @@ def evaluate(args):
     print(f"Evaluation saved: {report_path}", flush=True)
     print(f"valid end-to-end macro-F1={valid_metrics['endToEnd']['macroF1']:.6f}; "
           f"frozen test macro-F1={test_metrics['endToEnd']['macroF1']:.6f}", flush=True)
+    target = report["researchTarget"]
+    print(f"Research target {target['phase']} >= {target['minimum']:.0%}: "
+          + ", ".join(f"{name}={'-' if item['value'] is None else format(item['value'], '.3f')}"
+                      f"{' OK' if item['achieved'] else ''}" for name, item in target["measures"].items()),
+          flush=True)
     if unmet:
         print("Export blocked:\n- " + "\n- ".join(unmet), flush=True)
         return 2

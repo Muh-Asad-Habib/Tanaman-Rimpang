@@ -46,6 +46,28 @@ LIMITATIONS = [
     "Synthetic degradations (run_robustness) approximate, but do not replace, real field strata. "
     "No occlusion or temporal labels exist; small holdout group counts limit generalization.",
 ]
+RESEARCH_TARGET = {
+    "phase": "Fase 1 (roadmap proposal)",
+    "minimum": 0.85,
+    "note": "Research milestone from the proposal, not a deployment gate. Reported on the frozen test split.",
+}
+
+
+def research_target(metrics, minimum=RESEARCH_TARGET["minimum"]):
+    """Compare frozen-test metrics with the proposal's Phase-1 accuracy target (>= 85%)."""
+    sources = {
+        "classifierAccuracyGroundTruthCrops":
+            metrics["classifierGroundTruthCrops"]["unconditional"]["correctObjectCoverage"],
+        "endToEndAcceptedPrecision": metrics["endToEnd"]["acceptedPrecision"],
+        "endToEndCorrectObjectCoverage": metrics["endToEnd"]["acceptedCorrectObjectCoverage"],
+        "endToEndMacroF1": metrics["endToEnd"]["macroF1"],
+    }
+    measures = {
+        name: {"value": value, "achieved": None if value is None else value >= minimum}
+        for name, value in sources.items()
+    }
+    return {**RESEARCH_TARGET, "minimum": minimum, "measures": measures,
+            "allAchieved": all(item["achieved"] for item in measures.values())}
 
 
 def json_fingerprint(value):
