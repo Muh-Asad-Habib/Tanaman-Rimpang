@@ -159,7 +159,7 @@ def inspect_manifest(manifest):
     rows = manifest.get("images")
     if not isinstance(rows, list) or not rows:
         raise ValueError("Prepared manifest must contain images.")
-    paths, hashes, group_splits = set(), set(), {}
+    paths, hashes, group_splits, specimen_splits = set(), set(), {}, {}
     slugs = [label["slug"] for label in taxonomy()["labels"]]
     summaries, unmet = {}, []
     for row in rows:
@@ -187,6 +187,13 @@ def inspect_manifest(manifest):
         if group in group_splits and group_splits[group] != split:
             raise ValueError(f"Group crosses splits: {group}")
         group_splits[group] = split
+        specimen = row.get("specimenId")
+        if specimen is not None:
+            if not isinstance(specimen, str) or not specimen.strip() or specimen != specimen.strip():
+                raise ValueError(f"specimenId must be a normalized nonblank string: {path}")
+            if specimen in specimen_splits and specimen_splits[specimen] != split:
+                raise ValueError(f"Specimen crosses splits: {specimen}")
+            specimen_splits[specimen] = split
         if not isinstance(row.get("objects"), list):
             raise ValueError(f"Missing explicit reviewed objects list: {path}")
         for obj in row["objects"]:
@@ -205,6 +212,7 @@ def inspect_manifest(manifest):
         cardinality = Counter(len(row["objects"]) for row in subset)
         summary = {
             "images": len(subset), "groups": len({row["groupId"] for row in subset}),
+            "specimens": len({row["specimenId"] for row in subset if row.get("specimenId")}),
             "sources": dict(sorted(Counter(row["sourceId"] for row in subset).items())),
             "objects": sum(counts.values()),
             "objectsPerClass": {slug: counts[index] for index, slug in enumerate(slugs)},
@@ -231,6 +239,7 @@ def inspect_manifest(manifest):
                 unmet.append(f"{split}: add real reviewed multiobject frames with these instance counts: {', '.join(absent_counts)}.")
     return {
         "groupDisjoint": True, "totalImages": len(rows), "totalGroups": len(group_splits),
+        "totalSpecimens": len(specimen_splits),
         "splits": summaries, "eligible": not unmet, "unmetGates": unmet,
     }
 

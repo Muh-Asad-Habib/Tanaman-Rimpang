@@ -6,7 +6,7 @@ from pathlib import Path
 from PIL import Image
 
 from training.common import taxonomy, digest, write_json
-from training.dataset import audit_manifest, assign_splits, crop_box, prepare_images
+from training.dataset import audit_manifest, assign_splits, crop_box, prepare_images, split_units
 from training.bundle import install_bundle
 
 
@@ -78,6 +78,48 @@ class DatasetTests(unittest.TestCase):
         for group in {row["groupId"] for row in result}:
             self.assertEqual(group, group.strip())
             self.assertEqual(len({row["split"] for row in result if row["groupId"] == group}), 1)
+
+    def test_specimen_crossing_splits_rejected(self):
+        candidate = copy.deepcopy(self.manifest)
+        candidate["images"][0]["specimenId"] = "MKS-001"
+        candidate["images"][10]["specimenId"] = "MKS-001"
+        with self.assertRaises(ValueError):
+            audit_manifest(candidate, self.root)
+        candidate["images"][10]["specimenId"] = " "
+        with self.assertRaises(ValueError):
+            audit_manifest(candidate, self.root)
+
+    def test_capture_metadata_validated_and_reported(self):
+        candidate = copy.deepcopy(self.manifest)
+        candidate["images"][0].update(specimenId=" MKS-001 ", expertValidated=True, capture={
+            "location": "makassar", "lighting": "redup", "background": "tanah", "condition": "diiris"})
+        rows, report = audit_manifest(candidate, self.root)
+        self.assertEqual(rows[0]["specimenId"], "MKS-001")
+        self.assertEqual(report["specimens"], 1)
+        self.assertEqual(report["expertValidatedImages"], 1)
+        self.assertEqual(report["capture"]["location"], {"makassar": 1, "tidak-dicatat": 29})
+        for bad in ({"condition": "rebus"}, {"location": "Makassar Kota"}, {"cuaca": "hujan"}):
+            invalid = copy.deepcopy(self.manifest)
+            invalid["images"][0]["capture"] = bad
+            with self.assertRaises(ValueError):
+                audit_manifest(invalid, self.root)
+
+    def test_automatic_split_keeps_specimen_together(self):
+        images = []
+        for group in range(7):
+            for class_id in range(10):
+                name = f"session-{group}-{class_id}.png"
+                Image.new("RGB", (64, 48), (class_id * 20, group * 30, 90)).save(self.root / name)
+                images.append({"path": name, "sourceId": "synthetic-unit-test", "groupId": f"g{group}",
+                               "objects": [{"classId": class_id, "bbox": [0.1, 0.1, 0.5, 0.6]}]})
+        images[0]["specimenId"] = images[10]["specimenId"] = "MKS-001"
+        rows, _ = audit_manifest({**self.manifest, "images": images}, self.root)
+        units = split_units(rows)
+        self.assertEqual(units[0], units[15])
+        self.assertEqual(len(set(units)), 6)
+        for seed in range(5):
+            result = assign_splits(rows, seed)
+            self.assertEqual(len({row["split"] for row in result[:20]}), 1)
 
     def test_exact_duplicates_rejected(self):
         candidate = copy.deepcopy(self.manifest)

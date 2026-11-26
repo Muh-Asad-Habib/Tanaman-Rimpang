@@ -21,6 +21,18 @@
           "license": { "type": "string" },
           "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
           "split": { "enum": ["train", "valid", "test"] },
+          "specimenId": { "type": "string", "minLength": 1 },
+          "expertValidated": { "type": "boolean" },
+          "capture": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "location": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+              "lighting": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+              "background": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+              "condition": { "enum": ["lapangan", "dipanen", "dibersihkan", "diiris"] }
+            }
+          },
           "objects": {
             "type": "array",
             "items": {
